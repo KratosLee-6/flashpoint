@@ -33,3 +33,5 @@ target/
 api-key*
 credentials*
 .archify/
+.archify/
+marketing/
