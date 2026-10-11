@@ -31,8 +31,9 @@
 
 ## ▶ 演示
 
-<video src="assets/AI闪光点-碰撞台-实机演示.mp4" controls width="100%"></video>
-<p align="center"><b>实机演示</b> · Skill 碰撞 + 物化全流程录屏</p>
+**[📹 观看实机演示视频（V1.0.0 Release）](https://github.com/KratosLee-6/flashpoint/releases/tag/V1.0.0)** — Skill 碰撞 + 物化全流程录屏
+
+<img src="assets/hero-collision.gif" alt="快速碰撞演示" width="90%" />
 
 - **[快速碰撞 · 三步](#-快速碰撞)** — 选包 → 确认 → 出方案
 - **[物化并自测](#-物化并自测)** — 方案生成真实文件包，selftest 退出码判定
