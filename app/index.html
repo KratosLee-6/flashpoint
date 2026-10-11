@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f7"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="闪光点：你的本地灵感与成品空间。离线收藏、整理、碰撞与交付。">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* http://localhost:*; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<!-- connect-src 说明：本机的融合服务与 Tauri IPC 都在回环地址上，核心功能就是调它们；
+     页面自带这条 CSP 与 Tauri 注入的 CSP 是叠加生效的，两边都要放行，否则壳内发不出请求。
+     仅放行回环与 ipc，不放开任意外联。改这里之前请先看 tests/ui/security.spec.cjs。 -->
+<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg"><link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="stylesheet" href="./styles.css"><title>闪光点 · 让做过的事，继续发光</title>
+</head>
+<body>
+<a class="skip" href="#main">跳到内容</a>
+<aside class="sidebar">
+ <a class="brand" href="#home" data-nav="home"><span class="brand-symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 5c0 7-4 11-11 11 7 0 11 4 11 11 0-7 4-11 11-11-7 0-11-4-11-11Z" fill="currentColor"/></svg></span><span>闪光点<small>SPARKROOM</small></span></a>
+ <div class="space-label"><span class="avatar">我</span><div>我的本地空间<small>只属于这台设备</small></div><span class="tiny-dot"></span></div>
+ <nav aria-label="主导航" id="desktop-nav"></nav>
+ <div class="sidebar-projects"><div class="overline">最近的项目</div><div id="project-links"></div></div>
+ <div class="sidebar-bottom"><div class="local-label"><span class="tiny-dot"></span>完全本地 · 不需要登录</div><button class="plain-btn settings-shortcut" data-nav="settings">数据与偏好 <span>↗</span></button></div>
+</aside>
+<div class="workspace">
+ <header class="topbar"><div class="breadcrumb"><span>我的空间</span><i>/</i><strong id="view-name">灵感花园</strong></div><div class="top-actions"><span class="save-status" id="save-status" role="status">正在打开本地空间…</span><button class="sound-toggle" data-action="toggle-sound" aria-label="切换碰撞音效"><span class="sound-glyph">◒</span><span>声场</span></button><button class="search-shortcut" data-action="search" aria-label="搜索全部资料">⌕ <span>搜索</span><kbd>Ctrl K</kbd></button><button class="avatar" data-nav="settings" aria-label="打开偏好设置">我</button></div></header>
+ <aside id="update-banner" class="update-banner" hidden aria-live="polite"><span id="update-message"></span><button class="btn subtle" id="apply-update">更新并重新打开</button></aside>
+ <main id="main" tabindex="-1"><div id="view"><div class="loading"><span class="brand-symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 5c0 7-4 11-11 11 7 0 11 4 11 11 0-7 4-11 11-11-7 0-11-4-11-11Z" fill="currentColor"/></svg></span><p>正在收好你的闪光点…</p></div></div></main>
+ <footer class="main-footer"><span>把做过的事，变成下一次出发的光。</span><span>SPARKROOM / LOCAL EDITION 0.5.0</span></footer>
+</div>
+<nav class="mobile-nav" id="mobile-nav" aria-label="移动导航"></nav>
+<dialog id="detail-dialog" class="detail-dialog"><div id="detail-content"></div></dialog>
+<dialog id="editor-dialog" class="editor-dialog"><div class="dialog-head"><div><span class="overline">A NEW LITTLE SPARK</span><h2 id="editor-heading">收下一点灵感</h2></div><button class="close-btn" data-close="editor-dialog" aria-label="关闭编辑">×</button></div><form id="editor-form"><input type="hidden" name="id"><label>标题<input name="title" required maxlength="160" placeholder="这次做成了什么，或想到了什么？"></label><div class="form-pair"><label>归属项目<input name="project" maxlength="120" placeholder="例如：AI闪光点"></label><label>标签（用逗号分隔）<input name="tags" maxlength="300" placeholder="灵感, 产品, 待验证"></label></div><label>正文 / 下一步<textarea name="body" rows="10" maxlength="200000" placeholder="写下值得留下的内容。支持 Markdown。"></textarea></label><div class="form-foot"><span id="editor-note">内容只保存在本地。</span><button class="btn primary" type="submit">收好这束光 <span>↗</span></button></div></form></dialog>
+<dialog id="confirm-dialog" class="confirm-dialog"><h2 id="confirm-title"></h2><p id="confirm-copy"></p><div class="button-row"><button class="btn subtle" id="confirm-cancel">取消</button><button class="btn primary" id="confirm-yes">确认</button></div></dialog>
+<dialog id="restore-dialog" class="editor-dialog" aria-labelledby="restore-heading"><div class="dialog-head"><div><span class="eyebrow">REVIEW BEFORE RESTORE</span><h2 id="restore-heading">先看一眼，再恢复</h2></div><button class="close-btn" data-close="restore-dialog" aria-label="取消恢复">×</button></div><p id="restore-name" class="restore-file-name"></p><p id="restore-summary"></p><p id="restore-impact" class="restore-impact"></p><p>恢复前会保存一份原始快照。若空间不足或写入失败，本次替换将停止。成功后可在数据与偏好中导出快照。</p><label class="restore-consent"><input id="restore-confirm" type="checkbox">我已检查备份，确认替换当前资料与偏好</label><p id="restore-error" role="alert"></p><div class="button-row"><button class="btn subtle" data-close="restore-dialog">取消，保留当前资料</button><button class="btn primary" id="restore-apply" disabled>确认恢复</button></div></dialog>
+<dialog id="skill-dialog" class="editor-dialog" aria-labelledby="skill-import-heading"><div class="dialog-head"><div><span class="eyebrow">A REAL SKILL, KEPT LOCALLY</span><h2 id="skill-import-heading">导入 Skill</h2></div><button class="close-btn" data-close="skill-dialog" aria-label="关闭 Skill 导入">×</button></div><form id="skill-form"><label>读取本地 SKILL.md<input id="skill-file" type="file" accept=".md,text/markdown"></label><label>完整 Skill 内容<textarea id="skill-text" rows="8" maxlength="180000" placeholder="粘贴 SKILL.md 原文，或从上方选择文件。" required></textarea></label><details class="skill-supplement"><summary>缺少输入、输出或约束？补充声明</summary><p>每行一项。补充内容会追加到来源快照，并明确标记为人工补充。</p><label>补充输入<textarea name="inputs" rows="2" maxlength="1600" placeholder="例如：research.json"></textarea></label><label>补充输出<textarea name="outputs" rows="2" maxlength="1600" placeholder="例如：report.md"></textarea></label><label>补充约束<textarea name="constraints" rows="2" maxlength="1600" placeholder="例如：仅使用已核实的资料"></textarea></label></details><button id="skill-preview-button" class="btn subtle" type="button">解析并预览</button><div id="skill-preview" aria-live="polite"></div><p id="skill-error" role="alert"></p><div class="form-foot"><span>仅保存文本，不运行文件内的指令或脚本。</span><button id="skill-save" type="submit" class="btn primary" disabled>导入 Skill</button></div></form></dialog>
+<input hidden type="file" id="import-files" multiple accept=".md,.txt,.json,.jsonl,.csv,.html,.css,.js,.py">
+<input hidden type="file" id="restore-file" accept="application/json,.json">
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="./seed.js"></script><script src="./skills.js"></script><script src="./core.js"></script><script src="./storage.js"></script><script src="./runtime.js"></script><script src="./spark-fx.js"></script><script src="./fusion-ui.js"></script><script src="./app.js"></script>
+</body></html>
