@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="screenshots/实拍-01-融合工作区.png" alt="AI 闪光点碰撞台" width="100%" />
+<img src="assets/hero-collision.gif" alt="AI 闪光点 · 快速碰撞" width="90%" />
 
 # ✨ AI 闪光点 · Skill 碰撞台
 
