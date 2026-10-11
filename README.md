@@ -11,7 +11,7 @@
 [![Tests](https://img.shields.io/badge/tests-660%20passed-brightgreen)](app/fusion/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Web-9cf)](#快速开始)
 
-[功能](#-功能) · [快速开始](#-快速开始) · [它是怎么工作的](#-它是怎么工作的) · [实测数据](#-实测数据) · [架构](#-架构)
+[功能](#-功能) · [快速开始](#-快速开始) · [它是怎么工作的](#-它是怎么工作的) · [实测数据](#-实测数据) · [架构](#-架构) · [架构图](docs/architecture.html)
 
 </div>
 
@@ -145,6 +145,8 @@ npx tauri build
 ---
 
 ## 🏗 架构
+
+📊 **可视化架构图**：[docs/architecture.html](docs/architecture.html)（浏览器打开即可查看分层流水线）
 
 ```
 app/
