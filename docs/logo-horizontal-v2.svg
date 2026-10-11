@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="100" viewBox="0 0 520 100">
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- 图标区 -->
+  <g>
+    <rect x="4" y="14" width="36" height="36" rx="9" fill="#1658F5" transform="rotate(-8 22 32)"/>
+    <rect x="20" y="26" width="28" height="28" rx="7" fill="#B8D0FF" opacity=".7" transform="rotate(6 34 40)"/>
+    <path d="M30 22 C30 32 25 37 15 37 C25 37 30 42 30 52 C30 42 35 37 45 37 C35 37 30 32 30 22 Z" fill="#FFD60A" filter="url(#glow)"/>
+  </g>
+  <!-- 中文 -->
+  <text x="62" y="48" font-family="'Noto Sans SC','PingFang SC',sans-serif" font-size="34" font-weight="900" fill="#1F2937" letter-spacing="-0.5">闪光点</text>
+  <!-- 分隔线 -->
+  <line x1="158" y1="24" x2="158" y2="54" stroke="#D1D5DB" stroke-width="1.5"/>
+  <!-- 英文 -->
+  <text x="170" y="40" font-family="'Inter',sans-serif" font-size="22" font-weight="700" fill="#1658F5" letter-spacing="-.3">flashpoint</text>
+  <text x="170" y="56" font-family="'Inter',sans-serif" font-size="10.5" font-weight="500" fill="#9CA3AF" letter-spacing=".8">SKILL COLLISION WORKBENCH</text>
+  <!-- 底部线 -->
+  <line x1="62" y1="66" x2="340" y2="66" stroke="#E5E7EB" stroke-width="1"/>
+  <text x="62" y="82" font-family="'Noto Sans SC',sans-serif" font-size="11" fill="#9CA3AF">选两个 Skill 包，碰撞出一个新能力</text>
+</svg>

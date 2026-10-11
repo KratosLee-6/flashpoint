@@ -1,107 +1,93 @@
 <div align="center">
 
-<img src="docs/architecture.png" alt="AI 闪光点 · 碰撞台分层架构" width="70%" />
+<img src="docs/logo-horizontal.png" width="480" alt="AI 闪光点 · flashpoint">
 
-# ✨ AI 闪光点 · Skill 碰撞台
+<h1>AI 闪光点 · Skill 碰撞台</h1>
 
-**选两个 Skill 包，碰撞出一个新能力。**
+<p><strong>选两个 Skill 包，碰撞出一个新能力。</strong></p>
 
-本地优先 · 逐字引文可核 · 能跑得动才算数
+<p>本地优先 · 逐字引文可核 · 能跑得动才算数 · 方案不装完整，缺口自己列</p>
+
+<p>个人开源项目 by <a href="https://github.com/KratosLee-6">KratosLee</a> · 默认中文 · 离线确定性引擎 · AI 可选增强</p>
+
+</div>
+
+<div align="center">
 
 [![Version](https://img.shields.io/badge/version-V1.0.0-1658F5?style=flat-square)](VERSION.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-660%20passed-brightgreen?style=flat-square)](app/fusion/)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)]
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Web-9cf?style=flat-square)]
+[![License: MIT](https://img.shields.io/badge/License-MIT-D9A441?style=flat-square)](LICENSE)
+[![Tests](https://img.shields.io/badge/pytest-660%20passed%20%7C%203%20skipped-1F8A70)](app/fusion/)
+[![Node](https://img.shields.io/badge/node-37%20passed-173C8F?style=flat-square)](app/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square)](pyproject.toml)
 
-[功能](#-功能) · [怎么工作的](#-它是怎么工作的) · [实测数据](#-实测数据) · [快速开始](#-快速开始) · [架构](docs/architecture.html)
+[快速开始](#-快速开始) · [怎么工作的](#-它是怎么工作的) · [实测数据](#-实测数据) · [物化并自测](#-物化并自测) · [架构](#-架构)
 
 </div>
 
 ---
 
-## 📖 这是什么
+![AI 闪光点融合工作区（实拍）](screenshots/实拍-01-融合工作区.png)
+<p align="center"><b>融合工作区</b>（快速碰撞面板 · 选两个包 → 一次确认 → 等结果）</p>
 
-你手里有一堆 AI Skill 包——做教育的、做安全审计的、做数据可视化的。
+## ▶ 演示
 
-你想过把它们**碰在一起**吗？不是拼接，不是堆砌——是把 A 的方法论嫁接到 B 的场景上，产出两个父本都做不到的新能力。
+> 视频演示制作中。将展示从选包到物化自测的完整流程。
 
-三周前我试了一次，碰撞结果像两份说明书合订本。这三周就干了一件事：让它真的能跑。
-
-**AI 闪光点**是一个本地优先的桌面应用，把两个 AI Agent Skill 包放在一起，自动分析双方能力结构，发现跨域碰撞机会，生成包含可核验证据的新 Skill 方案——并最终物化为可运行的代码包。
-
----
-
-## 📸 界面
-
-| 快速碰撞 · 三步出方案 | 融合工作区 · 专家模式 |
-|---|---|
-| <img src="screenshots/实拍-02-快速碰撞面板.png" width="100%" /> | <img src="screenshots/实拍-01-融合工作区.png" width="100%" /> |
-| 选两个包，勾一次确认，等结果 | 逐文件审查材料、逐条引文核对 |
-
-| 物化并自测 · 能跑得动 | 模型设置 · 多协议支持 |
-|---|---|
-| <img src="screenshots/实拍-04-快速碰撞已填.png" width="100%" /> | <img src="screenshots/实拍-03-模型设置.png" width="100%" /> |
-
-> 🎬 **视频演示**：*制作中——将展示从选包到物化自测的完整流程。*
+- **[快速碰撞 · 三步](#-快速碰撞)** — 选包 → 确认 → 出方案
+- **[物化并自测](#-物化并自测)** — 方案生成真实文件包，selftest 退出码判定
+- **[A/B 对照 · n=16 两臂](#-实测数据)** — 整份 0/32 vs 分段 23/25
 
 ---
 
-## ✨ 功能
+## 🆕 快速碰撞（核心体验）
 
-### ⚡ 快速碰撞
+**选两个包，其余自动。**
 
-选两个 Skill 包（下拉选择或填路径）→ 勾一次确认 → 等几分钟出方案。
+<table>
+<tr>
+<td width="50%"><img src="screenshots/实拍-02-快速碰撞面板.png" alt="快速碰撞面板" /><br><b>下拉选包 → 勾一次确认 → 开始碰撞</b><br>上下文自动精简（SKILL.md 必留，逐文件留痕）；模型与接口来自设置页一次性配置。</td>
+<td width="50%"><img src="screenshots/实拍-04-快速碰撞已填.png" alt="已填表单" /><br><b>已填状态</b><br>目标、推理开关、费用确认——只需要这三个决策。</td>
+</tr>
+</table>
 
-<details>
-<summary>自动化了什么</summary>
+碰撞产出的是方案。方案之后还有两段工序：
 
-- **上下文自动精简**：SKILL.md 必留，其余按体积升序装满预算，逐文件留痕
-- **语义分段**：整份方案拆成自洽块（2 个能力画像 + 方向审查 + 3 个候选），每块独立生成
-- **段级确定性校验**：形状、枚举、数组边界、引文逐字归位、认领自洽——每段一返回就判
-- **定向重试**：只重试失败的段，把校验器的具体指控写进重试提示词
-- **证据重锚定**：引文转写误差自动修回真实文件内容（0.95/0.90 双阈值，唯一命中才归位）
-- **产物名推断**：文件名写到点就停的场景，按用途推断扩展名
-</details>
+<table>
+<tr>
+<td width="50%"><img src="screenshots/实拍-01-融合工作区.png" alt="融合工作区" /><br><b>融合工作区（专家模式）</b><br>逐候选审查：贡献来源、证据链、反证检查、评估计划。</td>
+<td width="50%"><img src="screenshots/实拍-03-模型设置.png" alt="模型设置" /><br><b>模型设置</b><br>多协议支持（OpenAI / Anthropic / Gemini / 本机），密钥仅本次会话内存。</td>
+</tr>
+</table>
 
-### 🔬 专家模式
+---
 
-需要逐文件审查材料、逐条核对引文、检查完整请求内容？切到专家模式，一步一步都在。
-
-<details>
-<summary>专家模式包含</summary>
-
-- 完整材料清点（含不可读文件的安全排除列表）
-- 逐文件发送选择（勾选 + 分类 + 取舍理由）
-- 能力结构与碰撞落点可视化
-- 规则方向排序与审查
-- 完整请求预览（含系统提示词、schema、源文件正文）
-- 连接检查（计费确认分离）
-- 碰撞结果逐候选审查（贡献来源、证据链、反证检查、评估计划）
-</details>
+## ✨ 核心能力
 
 ### 📦 物化并自测
 
-碰撞产出的是方案（纸上的东西）。「物化并自测」把它生成**真实的文件包**（脚本、模板、schema），再让包给自己出题——十几项检查逐条跑，**全过才算数**。
+**方案不算数，能跑才算数。** 碰撞完成后，一键物化：生成真实文件包（脚本、模板、schema），自动生成 selftest（合成数据调用包内真实代码），退出码判定。不过的，真实报错带回去定点修，修完重考。
 
-<details>
-<summary>物化流程</summary>
+### 🔬 可核验
 
-1. **生成段**：按方案逐文件产出真实内容（每个文件一次调用，哨兵裸文本传输）
-2. **本地校验**：路径与方案一致、Python 可编译、JSON 可解析、内容非空
-3. **运行段**：自动生成 selftest.py（用合成数据调用包内真实代码），退出码判定
-4. **修复回路**：selftest 失败时把真实 traceback 交给模型定点修，修完重考
-</details>
+每条证据都是母包里的**逐字引文**，带文件路径、行号和 SHA-256。引文重锚定修转写误差（0.95/0.90 双阈值，唯一命中才归位），编造引文零容忍。65 项契约条件逐一执行。
 
-### 📦 补足闭环
+### 📦 缺口自己列
 
-碰撞方案自己会列缺口（`needs_ai_fill` + `gaps_to_fill`）。对第 5 类候选，可以发起补足请求——模型带缺口清单再答一次，补完由同一个核对器复评。
+方案哪里证据不足、还差什么才能落地，由碰撞方案自己列出来（`needs_ai_fill` + `gaps_to_fill`）——不装完整。对第 5 类候选，可以发起补足请求，模型带缺口清单再答一次，补完由同一个核对器复评。
+
+### 🎨 签名特效
+
+WebGL 极光底纹 + 碰撞火花粒子（确定性 LCG 布局），三重门控（动效设置 / reduced-motion / JS motionOk），WebGL 不可用静默降级。
 
 ---
 
-## 🔬 它是怎么工作的
+## 🏗 它是怎么工作的
 
 不依赖模型"理解"两个 Skill 的语义——而是用**确定性算法**做四件事：
+
+📊 **可视化分层架构图**：[docs/architecture.html](docs/architecture.html)
+
+![AI 闪光点分层架构](docs/architecture.png)
 
 ### 1. 能力结构抽取
 
@@ -138,38 +124,48 @@
 
 ### 跨域碰撞（4 个 SkillHub 包 × 本地包，全部 accepted）
 
-| 包对 | 产出 | selftest |
+<details>
+<summary>展开查看碰撞产出</summary>
+
+| 包对 | 候选 A | 候选 B | 候选 C |
+|---|---|---|---|
+| 🛡 防骗话术 × 证据采集 | 防骗证据采集与可信度判别系统 | 可信证据采集与评估系统 | 风险感知证据收集系统 |
+| 🎨 润色去AI味 × 防刷计分 | 防刷信号驱动的文本质量门禁 | 防刷信号驱动的文本质量门禁 | 信号增强的事实核查提纲生成器 |
+| 👨‍👩‍👧 育儿顾问 × 设备密钥证明 | 证据驱动提纲验证器 | 提纲事实验证系统 | 事实验证系统 |
+| 💻 编程助手 × 默认拒绝权限 | AI编码助手操作权限管理系统 | AI编码助手权限控制系统 | AI编码助手权限管理融合系统 |
+</details>
+
+### 物化 selftest
+
+| 融合包 | 检查项 | 结果 |
 |---|---|---|
-| 🛡 防骗话术 × 证据采集 | 来源可信度验证器 | — |
-| 🎨 润色去AI味 × 防刷计分 | 文本质量门禁 | ✅ |
-| 👨‍👩‍👧 育儿顾问 × 设备密钥证明 | 建议签名 + 防重放 | ✅ 14 项 |
-| 💻 编程助手 × 默认拒绝权限 | AI 操作权限扫描器 | ✅ 14 项 |
+| 育儿顾问 × 设备密钥证明 | 11 | ✅ 全过 |
+| 润色去AI味 × 防刷计分 | 14 | ✅ 全过 |
+| 编程助手 × 默认拒绝权限 | 14 | ✅ 全过 |
 
 ---
 
-## 🏗 架构
+## 🧪 测试 Skill 包
 
-📊 **可视化分层架构图**：[docs/architecture.html](docs/architecture.html)
+以下 Skill 包用于碰撞测试（从 [SkillHub](https://skillhub.cn/skills?sortBy=score) 下载）：
 
-```
-app/
-├── index.html           入口（CSP 严格，无外部依赖）
-├── styles.css           三主题：paper / forest / night
-├── core.js              数据模型 + 模型访问管理
-├── spark-fx.js          签名特效（WebGL 极光 + 碰撞粒子）
-├── fusion-ui.js         融合工作区 UI（快速 / 专家双模式）
-├── app.js               应用主逻辑（资料库/设置/路由）
-└── fusion/              Spark Core 引擎（Python）
-    ├── capability.py        能力结构抽取（8 轴 + 桥接 + 失效面）
-    ├── collide.py           本地碰撞候选生成
-    ├── segments.py          语义分段 + 段级确定性校验
-    ├── contract.py          65 项验收契约
-    ├── evidence_reanchor.py 引文重锚定（0.95/0.90 双阈值）
-    ├── engine.py            编排：prepare → 分段 → 验收链
-    ├── materialize.py       方案 → 真实文件包 → selftest
-    ├── server.py            HTTP 服务（loopback + 令牌）
-    └── ...
-```
+| 包 | 领域 | 大小 |
+|---|---|---|
+| anti-fraud | 防骗话术识别 | 185 KB |
+| libai | 中文润色去 AI 味 | 286 KB |
+| parenting-expert | 育儿顾问 | 657 KB |
+| dev-expert | 编程专家 | 1 MB |
+
+本地 curated 包：
+
+| 包 | 领域 |
+|---|---|
+| anti-cheat-scoring | 防刷信号计分 |
+| consent-default-deny | 默认拒绝授权 |
+| device-key-attestation | 设备密钥证明 |
+| evidence-collector | 证据采集 |
+| outline-writer | 写作提纲 |
+| sandbox-design-discipline | 沙箱权限设计 |
 
 ---
 
@@ -203,11 +199,11 @@ npx tauri build
 
 ### 模型配置
 
-在「数据与偏好 → 调用模型」里配置接口地址、模型名和密钥。仅本次会话内存，不落盘。支持：
+在「数据与偏好 → 调用模型」里配置接口地址、模型名和密钥。仅本次会话内存，不落盘。
 
 | 协议 | 服务商 |
 |---|---|
-| OpenAI | GPT / DeepSeek / MiniMax / 零一万物 / Kimi … |
+| OpenAI | GPT / DeepSeek / MiniMax / 零一万物 / Kimi |
 | Anthropic | Claude |
 | Gemini | Google Gemini |
 | 本机模型 | Ollama / LM Studio（不需要密钥） |
@@ -231,32 +227,6 @@ npx playwright test --config playwright.fusion.config.cjs
 
 ---
 
-## 📦 测试用 Skill 包
-
-以下 Skill 包用于碰撞测试（从 [SkillHub](https://skillhub.cn/skills?sortBy=score) 下载）：
-
-| 包 | 领域 | 来源 | 大小 |
-|---|---|---|---|
-| anti-fraud | 防骗话术识别 | SkillHub | 185 KB |
-| libai | 中文润色去 AI 味 | SkillHub | 286 KB |
-| parenting-expert | 育儿顾问 | SkillHub | 657 KB |
-| dev-expert | 编程专家 | SkillHub | 1 MB |
-
-本地 curated 包：
-
-| 包 | 领域 |
-|---|---|
-| anti-cheat-scoring | 防刷信号计分 |
-| consent-default-deny | 默认拒绝授权 |
-| device-key-attestation | 设备密钥证明 |
-| evidence-collector | 证据采集 |
-| outline-writer | 写作提纲 |
-| sandbox-design-discipline | 沙箱权限设计 |
-| package-permission-design | 包权限设计 |
-| ast-static-scan-arch | AST 静态扫描 |
-
----
-
 ## 📋 诚实体边界
 
 | ✅ 已验证 | ❌ 未验证 |
@@ -274,6 +244,7 @@ npx playwright test --config playwright.fusion.config.cjs
 - [ ] SkillHub 在线搜索集成
 - [ ] 更多模型适配（glm-4.7 / Claude / GPT）
 - [ ] 桌面自动更新通道
+- [ ] 候选块二段化转正（M3 sweep 失败对 2/2 翻绿，待 n≥16 确认）
 
 ---
 
