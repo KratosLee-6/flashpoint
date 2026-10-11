@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/hero-collision.gif" alt="AI 闪光点 · 快速碰撞" width="90%" />
+<img src="docs/architecture.png" alt="AI 闪光点 · 碰撞台分层架构" width="70%" />
 
 # ✨ AI 闪光点 · Skill 碰撞台
 
@@ -8,83 +8,108 @@
 
 本地优先 · 逐字引文可核 · 能跑得动才算数
 
-[![Version](https://img.shields.io/badge/version-V1.0.0-1658F5)](VERSION.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-660%20passed-brightgreen)](app/fusion/)
+[![Version](https://img.shields.io/badge/version-V1.0.0-1658F5?style=flat-square)](VERSION.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-660%20passed-brightgreen?style=flat-square)](app/fusion/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)]
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Web-9cf?style=flat-square)]
 
-[快速开始](#-快速开始) · [怎么工作的](#-它是怎么工作的) · [实测数据](#-实测数据) · [物化](#-物化并自测) · [架构](docs/architecture.html)
+[功能](#-功能) · [怎么工作的](#-它是怎么工作的) · [实测数据](#-实测数据) · [快速开始](#-快速开始) · [架构](docs/architecture.html)
 
 </div>
 
 ---
 
-## 💡 为什么做这个
+## 📖 这是什么
 
 你手里有一堆 AI Skill 包——做教育的、做安全审计的、做数据可视化的。
 
 你想过把它们**碰在一起**吗？不是拼接，不是堆砌——是把 A 的方法论嫁接到 B 的场景上，产出两个父本都做不到的新能力。
 
-三周前我试了一次，[翻车了](https://github.com/KratosLee-6/AI--boom)。碰撞结果像两份说明书合订本。
+三周前我试了一次，碰撞结果像两份说明书合订本。这三周就干了一件事：让它真的能跑。
 
-这三周我干了一件事：让它真的能跑。
-
----
-
-## 🚀 现在怎么用
-
-> 选两个包 → 勾一次确认 → 等几分钟出方案 → 点「物化并自测」→ 拿到一个能跑的文件包
-
-<div align="center">
-<img src="screenshots/实拍-02-快速碰撞面板.png" alt="快速碰撞界面" width="80%" />
-</div>
-
-界面上只需要选两个包、写一句偏好（可选）、勾一次费用确认。上下文自动精简、格式校验、证据核对全部在后台完成。
-
-需要逐文件审查材料、逐条核对引文？切到**专家模式**，一步一步都在。
+**AI 闪光点**是一个本地优先的桌面应用，把两个 AI Agent Skill 包放在一起，自动分析双方能力结构，发现跨域碰撞机会，生成包含可核验证据的新 Skill 方案——并最终物化为可运行的代码包。
 
 ---
 
-## 📊 实测数据
+## 📸 界面
 
-### 同一模型 · 同一材料 · 各 16 次
+| 快速碰撞 · 三步出方案 | 融合工作区 · 专家模式 |
+|---|---|
+| <img src="screenshots/实拍-02-快速碰撞面板.png" width="100%" /> | <img src="screenshots/实拍-01-融合工作区.png" width="100%" /> |
+| 选两个包，勾一次确认，等结果 | 逐文件审查材料、逐条引文核对 |
 
-| | 通过率 | 说明 |
-|---|---|---|
-| 一次性输出完整方案 | **0/32** | 写两万字必崩 |
-| 分段 + 逐段校验 + 定向重试 | **23/25** | 错哪补哪，只重试坏的那块 |
+| 物化并自测 · 能跑得动 | 模型设置 · 多协议支持 |
+|---|---|
+| <img src="screenshots/实拍-04-快速碰撞已填.png" width="100%" /> | <img src="screenshots/实拍-03-模型设置.png" width="100%" /> |
 
-> 差距不在模型变聪明——在工序。把"一次写对两万字"换成"每块考完再拼"。
-
-### 四个跨域碰撞包，物化后全部可运行
-
-| 碰撞组合 | 产出 | selftest |
-|---|---|---|
-| 🛡 防骗话术 × 证据采集 | 来源可信度验证器 | ✅ |
-| 🎨 润色去AI味 × 防刷计分 | 文本质量门禁 | ✅ |
-| 👨‍👩‍👧 育儿顾问 × 设备密钥证明 | 建议签名 + 防重放 | ✅ 14 项 |
-| 💻 编程助手 × 默认拒绝权限 | AI 操作权限扫描器 | ✅ 14 项 |
+> 🎬 **视频演示**：*制作中——将展示从选包到物化自测的完整流程。*
 
 ---
 
-## 🎬 视频演示
+## ✨ 功能
 
-> 📹 视频演示制作中——将展示从选包到物化自测的完整流程。
+### ⚡ 快速碰撞
 
-<!-- 
-<video src="assets/demo.mp4" controls width="100%"></video>
-或
-<img src="assets/demo.gif" width="100%" />
--->
+选两个 Skill 包（下拉选择或填路径）→ 勾一次确认 → 等几分钟出方案。
+
+<details>
+<summary>自动化了什么</summary>
+
+- **上下文自动精简**：SKILL.md 必留，其余按体积升序装满预算，逐文件留痕
+- **语义分段**：整份方案拆成自洽块（2 个能力画像 + 方向审查 + 3 个候选），每块独立生成
+- **段级确定性校验**：形状、枚举、数组边界、引文逐字归位、认领自洽——每段一返回就判
+- **定向重试**：只重试失败的段，把校验器的具体指控写进重试提示词
+- **证据重锚定**：引文转写误差自动修回真实文件内容（0.95/0.90 双阈值，唯一命中才归位）
+- **产物名推断**：文件名写到点就停的场景，按用途推断扩展名
+</details>
+
+### 🔬 专家模式
+
+需要逐文件审查材料、逐条核对引文、检查完整请求内容？切到专家模式，一步一步都在。
+
+<details>
+<summary>专家模式包含</summary>
+
+- 完整材料清点（含不可读文件的安全排除列表）
+- 逐文件发送选择（勾选 + 分类 + 取舍理由）
+- 能力结构与碰撞落点可视化
+- 规则方向排序与审查
+- 完整请求预览（含系统提示词、schema、源文件正文）
+- 连接检查（计费确认分离）
+- 碰撞结果逐候选审查（贡献来源、证据链、反证检查、评估计划）
+</details>
+
+### 📦 物化并自测
+
+碰撞产出的是方案（纸上的东西）。「物化并自测」把它生成**真实的文件包**（脚本、模板、schema），再让包给自己出题——十几项检查逐条跑，**全过才算数**。
+
+<details>
+<summary>物化流程</summary>
+
+1. **生成段**：按方案逐文件产出真实内容（每个文件一次调用，哨兵裸文本传输）
+2. **本地校验**：路径与方案一致、Python 可编译、JSON 可解析、内容非空
+3. **运行段**：自动生成 selftest.py（用合成数据调用包内真实代码），退出码判定
+4. **修复回路**：selftest 失败时把真实 traceback 交给模型定点修，修完重考
+</details>
+
+### 📦 补足闭环
+
+碰撞方案自己会列缺口（`needs_ai_fill` + `gaps_to_fill`）。对第 5 类候选，可以发起补足请求——模型带缺口清单再答一次，补完由同一个核对器复评。
 
 ---
 
 ## 🔬 它是怎么工作的
 
-不依赖模型"理解"两个 Skill 的语义——而是用**确定性算法**做三件事：
+不依赖模型"理解"两个 Skill 的语义——而是用**确定性算法**做四件事：
 
 ### 1. 能力结构抽取
 
-从每个 Skill 包中提取 8 个与领域无关的结构轴：步骤、条件、约束、校验、交付物、证据引用、边界、受众。法律包和汽修包可以零共同词汇，但都有步骤和约束。
+从每个 Skill 包中提取 8 个与领域无关的结构轴：
+
+> 步骤 · 条件 · 约束 · 校验 · 交付物 · 证据引用 · 边界 · 受众
+
+法律包和汽修包可以零共同词汇，但都有步骤和约束。
 
 ### 2. 碰撞落点计算
 
@@ -98,15 +123,33 @@
 
 通过验收的方案生成真实文件包（脚本、模板、schema），再让包给自己出题——selftest 退出码判定「能不能跑得动」。
 
-<div align="center">
-<img src="screenshots/实拍-02-快速碰撞面板.png" alt="快速碰撞面板" width="80%" />
-</div>
+---
+
+## 📊 实测数据
+
+### A/B 对照（同材料同模型各 16 次）
+
+| | 通过率 | 说明 |
+|---|---|---|
+| 一次性输出完整方案 | **0/32** | 写两万字必崩 |
+| 分段 + 逐段校验 + 定向重试 | **23/25** | 错哪补哪，只重试坏的那块 |
+
+> 差距不在模型变聪明——在工序。把"一次写对两万字"换成"每块考完再拼"。
+
+### 跨域碰撞（4 个 SkillHub 包 × 本地包，全部 accepted）
+
+| 包对 | 产出 | selftest |
+|---|---|---|
+| 🛡 防骗话术 × 证据采集 | 来源可信度验证器 | — |
+| 🎨 润色去AI味 × 防刷计分 | 文本质量门禁 | ✅ |
+| 👨‍👩‍👧 育儿顾问 × 设备密钥证明 | 建议签名 + 防重放 | ✅ 14 项 |
+| 💻 编程助手 × 默认拒绝权限 | AI 操作权限扫描器 | ✅ 14 项 |
 
 ---
 
 ## 🏗 架构
 
-📊 **可视化分层架构图**：[docs/architecture.html](docs/architecture.html)（浏览器打开即可查看分层流水线）
+📊 **可视化分层架构图**：[docs/architecture.html](docs/architecture.html)
 
 ```
 app/
@@ -162,10 +205,55 @@ npx tauri build
 
 在「数据与偏好 → 调用模型」里配置接口地址、模型名和密钥。仅本次会话内存，不落盘。支持：
 
-- OpenAI 协议（GPT / DeepSeek / MiniMax / 零一万物 …）
-- Anthropic 协议（Claude）
-- Gemini 协议
-- 本机模型（Ollama / LM Studio，不需要密钥）
+| 协议 | 服务商 |
+|---|---|
+| OpenAI | GPT / DeepSeek / MiniMax / 零一万物 / Kimi … |
+| Anthropic | Claude |
+| Gemini | Google Gemini |
+| 本机模型 | Ollama / LM Studio（不需要密钥） |
+
+---
+
+## 🧪 测试
+
+```bash
+# Python 融合引擎（660+ 条）
+python -m pytest app/fusion/ -q
+
+# 前端 Node 测试（37 条）
+node --test app/runtime.test.cjs app/app.test.cjs app/storage.test.cjs
+
+# Playwright UI（设计规范 + 性能守卫 + 融合工作区）
+cd app
+npx playwright test tests/ui/design.spec.cjs
+npx playwright test --config playwright.fusion.config.cjs
+```
+
+---
+
+## 📦 测试用 Skill 包
+
+以下 Skill 包用于碰撞测试（从 [SkillHub](https://skillhub.cn/skills?sortBy=score) 下载）：
+
+| 包 | 领域 | 来源 | 大小 |
+|---|---|---|---|
+| anti-fraud | 防骗话术识别 | SkillHub | 185 KB |
+| libai | 中文润色去 AI 味 | SkillHub | 286 KB |
+| parenting-expert | 育儿顾问 | SkillHub | 657 KB |
+| dev-expert | 编程专家 | SkillHub | 1 MB |
+
+本地 curated 包：
+
+| 包 | 领域 |
+|---|---|
+| anti-cheat-scoring | 防刷信号计分 |
+| consent-default-deny | 默认拒绝授权 |
+| device-key-attestation | 设备密钥证明 |
+| evidence-collector | 证据采集 |
+| outline-writer | 写作提纲 |
+| sandbox-design-discipline | 沙箱权限设计 |
+| package-permission-design | 包权限设计 |
+| ast-static-scan-arch | AST 静态扫描 |
 
 ---
 
@@ -177,6 +265,15 @@ npx tauri build
 | 证据逐字引文可核 | 新 Skill 长期运行稳定性 |
 | 物化包 selftest 可运行 | 商业价值与市场规模 |
 | 4 个跨域包对全部 accepted | 更大样本量的统计显著性 |
+
+---
+
+## 🗓 Roadmap
+
+- [ ] 五基线对照实验（效果验证）
+- [ ] SkillHub 在线搜索集成
+- [ ] 更多模型适配（glm-4.7 / Claude / GPT）
+- [ ] 桌面自动更新通道
 
 ---
 
