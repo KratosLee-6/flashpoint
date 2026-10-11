@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/logo-horizontal.png" width="480" alt="AI 闪光点 · flashpoint">
+<img src="docs/logo-horizontal.png" width="340" alt="AI 闪光点 · flashpoint">
 
 <h1>AI 闪光点 · Skill 碰撞台</h1>
 
