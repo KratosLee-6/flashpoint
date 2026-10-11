@@ -26,7 +26,7 @@
 
 ---
 
-![AI 闪光点融合工作区（实拍）](screenshots/实拍-01-融合工作区.png)
+![AI 闪光点融合工作区（实拍）](screenshots/app-expert-mode.png)
 <p align="center"><b>融合工作区</b>（快速碰撞面板 · 选两个包 → 一次确认 → 等结果）</p>
 
 ## ▶ 演示
@@ -47,8 +47,8 @@
 
 <table>
 <tr>
-<td width="50%"><img src="screenshots/实拍-02-快速碰撞面板.png" alt="快速碰撞面板" /><br><b>下拉选包 → 勾一次确认 → 开始碰撞</b><br>上下文自动精简（SKILL.md 必留，逐文件留痕）；模型与接口来自设置页一次性配置。</td>
-<td width="50%"><img src="screenshots/实拍-04-快速碰撞已填.png" alt="已填表单" /><br><b>已填状态</b><br>目标、推理开关、费用确认——只需要这三个决策。</td>
+<td width="50%"><img src="screenshots/app-quick-collision.png" alt="快速碰撞面板" /><br><b>下拉选包 → 勾一次确认 → 开始碰撞</b><br>上下文自动精简（SKILL.md 必留，逐文件留痕）；模型与接口来自设置页一次性配置。</td>
+<td width="50%"><img src="screenshots/app-quick-collision.png" alt="已填表单" /><br><b>已填状态</b><br>目标、推理开关、费用确认——只需要这三个决策。</td>
 </tr>
 </table>
 
@@ -56,8 +56,8 @@
 
 <table>
 <tr>
-<td width="50%"><img src="screenshots/实拍-01-融合工作区.png" alt="融合工作区" /><br><b>融合工作区（专家模式）</b><br>逐候选审查：贡献来源、证据链、反证检查、评估计划。</td>
-<td width="50%"><img src="screenshots/实拍-03-模型设置.png" alt="模型设置" /><br><b>模型设置</b><br>多协议支持（OpenAI / Anthropic / Gemini / 本机），密钥仅本次会话内存。</td>
+<td width="50%"><img src="screenshots/app-expert-mode.png" alt="融合工作区" /><br><b>融合工作区（专家模式）</b><br>逐候选审查：贡献来源、证据链、反证检查、评估计划。</td>
+<td width="50%"><img src="screenshots/app-model-settings.png" alt="模型设置" /><br><b>模型设置</b><br>多协议支持（OpenAI / Anthropic / Gemini / 本机），密钥仅本次会话内存。</td>
 </tr>
 </table>
 
