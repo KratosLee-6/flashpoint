@@ -1,122 +1,128 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
-<meta charset="utf-8">
-<title>AI 闪光点 · 碰撞台架构</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Skill 碰撞台 · 分层流水线</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Inter:wght@400;600;700;900&display=swap');
-*{box-sizing:border-box;margin:0;padding:0}
-body{width:1080px;height:1440px;background:#F5F7FA;font-family:'Noto Sans SC','PingFang SC',system-ui,sans-serif;color:#1F2937;padding:60px 70px;position:relative;overflow:hidden}
-.header{margin-bottom:36px}
-.eyebrow{font-size:14px;font-weight:700;letter-spacing:.2em;color:#1658F5;margin-bottom:10px}
-h1{font-size:42px;font-weight:900;line-height:1.15;letter-spacing:-.02em}
-.pipeline{display:flex;flex-direction:column;gap:0;margin-bottom:28px}
-.layer{display:grid;grid-template-columns:180px 1fr;gap:18px;padding:20px 0;border-top:1px solid #E5E7EB}
-.layer-label{display:flex;flex-direction:column;gap:6px}
-.layer-label .code{font-size:32px;font-weight:900;color:#1658F5}
-.layer-label .type{font-size:12px;padding:3px 10px;border-radius:99px;display:inline-block;width:fit-content;font-weight:600}
-.type.local{background:#DCFCE7;color:#166534}
-.type.model{background:#FEF3C7;color:#92400E}
-.type.verify{background:#EDE9FE;color:#6D28D9}
-.type.output{background:#DBEAFE;color:#1E40AF}
-.layer-label h3{font-size:18px;font-weight:700}
-.layer-content{display:flex;flex-direction:column;gap:10px}
-.module-row{display:flex;gap:10px;flex-wrap:wrap}
-.module{background:#fff;border:1px solid #D1D5DB;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:500}
-.module .file{font-family:'Inter',monospace;font-size:12px;color:#6B7280;display:block;margin-top:2px}
-.module.hl{border-color:#1658F5;background:#EEF2FF}
-.arrow-down{text-align:center;font-size:28px;color:#9CA3AF;margin:-4px 0;padding-left:180px}
-.arrow-down span{display:inline-block}
-.features{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:8px}
-.feature{background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:18px 20px}
-.feature .ico{font-size:28px;margin-bottom:8px}
-.feature b{font-size:16px;display:block;margin-bottom:6px}
-.feature p{font-size:13px;color:#6B7280;line-height:1.6}
-.footer{position:absolute;left:70px;right:70px;bottom:36px;display:flex;justify-content:space-between;font-size:14px;color:#9CA3AF;border-top:1px solid #E5E7EB;padding-top:16px}
-.footer b{color:#1658F5}
-.badge{display:inline-block;padding:4px 12px;border-radius:99px;font-size:12px;font-weight:600;margin-right:6px}
-.badge.green{background:#DCFCE7;color:#166534}
-.badge.blue{background:#DBEAFE;color:#1E40AF}
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--text2:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--purple:#bc8cff;--emerald:#2ea043;--blue:#58a6ff;--violet:#bc8cff;--rose:#f85149}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans SC','PingFang SC',system-ui,sans-serif;padding:40px 50px;min-height:100vh}
+.header{margin-bottom:32px}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.2em;color:var(--accent);margin-bottom:8px}
+h1{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.subtitle{font-size:14px;color:var(--text2);margin-top:6px}
+.view-tabs{display:flex;gap:8px;margin:24px 0 20px;flex-wrap:wrap}
+.view-tab{padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--text2);font-size:13px;cursor:pointer;font-weight:500}
+.view-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chart-area{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;overflow-x:auto}
+svg{width:100%;height:auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:28px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+.card .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:8px}
+.card .dot.emerald{background:var(--emerald)}
+.card .dot.blue{background:var(--blue)}
+.card .dot.rose{background:var(--rose)}
+.card h3{font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center}
+.card ul{list-style:none;padding:0}
+.card li{font-size:13px;color:var(--text2);line-height:1.7;padding-left:16px;position:relative}
+.card li:before{content:"·";position:absolute;left:0;color:var(--accent)}
+.legend{display:flex;gap:16px;margin-top:16px;flex-wrap:wrap;font-size:12px;color:var(--text2)}
+.legend span{display:flex;align-items:center;gap:5px}
+.legend .ld{width:12px;height:12px;border-radius:3px;display:inline-block}
 </style>
 </head>
 <body>
 <div class="header">
-  <div class="eyebrow">ARCHITECTURE / 碰撞台分层架构</div>
-  <h1>AI 闪光点 · Skill 碰撞台</h1>
+  <div class="eyebrow">ARCHIFY / 分层流水线</div>
+  <h1>Skill 碰撞台 · 分层流水线</h1>
+  <p class="subtitle">从两个 Skill 包到一个能跑的新技能，五层缺一不可。点击视图切换焦点。</p>
 </div>
-
-<div class="pipeline">
-  <div class="layer">
-    <div class="layer-label"><span class="code">L0</span><span class="type local">本地确定性</span><h3>材料层</h3></div>
-    <div class="layer-content">
-      <div class="module-row">
-        <div class="module">packages.py<span class="file">快照 · 哈希 · 安全路径</span></div>
-        <div class="module">capability.py<span class="file">8 轴能力结构抽取</span></div>
-        <div class="module">collide.py<span class="file">失效面 → 碰撞候选</span></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="arrow-down"><span>│ 碰撞候选（锚点可核）</span></div>
-
-  <div class="layer">
-    <div class="layer-label"><span class="code">L1</span><span class="type local">本地确定性</span><h3>分段层</h3></div>
-    <div class="layer-content">
-      <div class="module-row">
-        <div class="module hl">segments.py<span class="file">段级指令自动生成 · 确定性校验</span></div>
-        <div class="module">skeleton.py<span class="file">骨架 · 确定性形状</span></div>
-        <div class="module">context.py<span class="file">auto_selection 精简</span></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="arrow-down"><span>│ 每块考完再拼</span></div>
-
-  <div class="layer">
-    <div class="layer-label"><span class="code">L2</span><span class="type model">模型调用</span><h3>论证层</h3></div>
-    <div class="layer-content">
-      <div class="module-row">
-        <div class="module">engine.py<span class="file">chat_complete · 分段编排</span></div>
-        <div class="module">providers.py<span class="file">OpenAI / Anthropic / Gemini</span></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="arrow-down"><span>│ 模型方案（非最终结果）</span></div>
-
-  <div class="layer">
-    <div class="layer-label"><span class="code">L3</span><span class="type verify">本地确定性</span><h3>验收链</h3></div>
-    <div class="layer-content">
-      <div class="module-row">
-        <div class="module">contract.py<span class="file">65 项契约</span></div>
-        <div class="module">evidence_reanchor.py<span class="file">引文重锚定 0.95/0.90</span></div>
-        <div class="module">materialize.py<span class="file">方案 → 真实包 + selftest</span></div>
-        <div class="module">skeleton.py<span class="file">装配 + 填哈希</span></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="arrow-down"><span>│ 通过 65 项契约 → accepted</span></div>
-
-  <div class="layer">
-    <div class="layer-label"><span class="code">L4</span><span class="type output">可交付</span><h3>物化层</h3></div>
-    <div class="layer-content">
-      <div class="module-row">
-        <div class="module hl">materialize.py<span class="file">哨兵传输 → 真实文件包 → selftest 退出码判定</span></div>
-      </div>
-    </div>
-  </div>
+<div class="view-tabs" id="tabs"></div>
+<div class="chart-area"><svg id="chart" viewBox="0 0 1080 720"></svg></div>
+<div class="cards" id="cards"></div>
+<div class="legend">
+  <span><span class="ld" style="background:var(--green)"></span>输入 / 通过</span>
+  <span><span class="ld" style="background:var(--accent)"></span>处理 / 模型</span>
+  <span><span class="ld" style="background:var(--purple)"></span>校验 / 判官</span>
+  <span><span class="ld" style="background:var(--red)"></span>修复 / 拒绝</span>
+  <span><span class="ld" style="background:var(--yellow)"></span>物化 / 输出</span>
 </div>
+<script>
+const DATA={"schema_version":1,"diagram_type":"lifecycle","meta":{"title":"Skill 碰撞台 · 分层流水线","views":[{"id":"pipeline","label":"完整流水线","focus":["materials","capability","collide","segments","model","reanchor","contract","accepted","materialize","repair","rejected"],"note":"从两个包到一个能跑的新技能。"},{"id":"verify","label":"验收链","focus":["segments","model","reanchor","contract","materialize","rejected"],"note":"先修后判——重锚定 → 65 项契约。"},{"id":"quick","label":"快速碰撞","focus":["materials","capability","collide","segments","model","contract","accepted","materialize"],"note":"选两个包 → 一次确认 → 自动精简 → 等结果。"}]},"lanes":[{"id":"main","label":"碰撞流水线"},{"id":"repair","label":"修复回路"}],"states":[{"id":"materials","type":"start","label":"两个 Skill 包","sublabel":"SKILL.md + 脚本 + 资源","lane":"main","col":0,"step":"01","tag":"输入"},{"id":"capability","type":"process","label":"能力结构层","sublabel":"8 轴抽取 · 桥接面 · 失效面","lane":"main","col":1,"step":"02","tag":"确定性"},{"id":"collide","type":"decision","label":"碰撞候选","sublabel":"失效面优先 · 锚点可核","lane":"main","col":2,"step":"03","tag":"落点"},{"id":"segments","type":"process","label":"语义分段","sublabel":"profiles×2 + reviews + candidates×3","lane":"main","col":3,"step":"04","tag":"拆块"},{"id":"model","type":"active","label":"模型论证","sublabel":"逐块生成 · 定向重试","lane":"main","col":4,"step":"05","tag":"模型"},{"id":"reanchor","type":"process","label":"重锚定","sublabel":"引文修转写 · 产物名推断","lane":"main","col":5,"step":"06","tag":"先修"},{"id":"contract","type":"decision","label":"65 项契约","sublabel":"引文逐字 · 形状 · 锁 · 零容忍","lane":"main","col":6,"step":"07","tag":"判官"},{"id":"accepted","type":"success","label":"方案定稿","sublabel":"逐候选审查 · 缺口自带","lane":"main","col":7,"step":"08","tag":"通过"},{"id":"materialize","type":"output","label":"物化并自测","sublabel":"真实文件包 + selftest","lane":"main","col":8,"step":"09","tag":"能跑"},{"id":"repair","type":"failure","label":"修复回路","sublabel":"真实 traceback 定点修","lane":"repair","col":4,"step":"R1","yOffset":90,"tag":"可救"},{"id":"rejected","type":"failure","label":"拒绝","sublabel":"编造 · 缺字段 → 拒","lane":"repair","col":6,"step":"R2","yOffset":90,"tag":"零放行"}],"transitions":[{"id":"mat-cap","from":"materials","to":"capability","variant":"default"},{"id":"cap-col","from":"capability","to":"collide","variant":"default"},{"id":"col-seg","from":"collide","to":"segments","variant":"default"},{"id":"seg-mod","from":"segments","to":"model","variant":"emphasis"},{"id":"mod-rea","from":"model","to":"reanchor","variant":"default"},{"id":"rea-con","from":"reanchor","to":"contract","variant":"default"},{"id":"con-acc","from":"contract","to":"accepted","variant":"emphasis"},{"id":"acc-mat","from":"accepted","to":"materialize","variant":"default"},{"id":"mod-rep","from":"model","to":"repair","variant":"security"},{"id":"rep-seg","from":"repair","to":"segments","variant":"emphasis"},{"id":"con-rej","from":"contract","to":"rejected","variant":"security"},{"id":"rej-seg","from":"rejected","to":"segments","variant":"emphasis"}],"cards":[{"dot":"emerald","title":"五层流水线","items":["材料 → 能力结构 → 碰撞 → 分段 → 模型 → 重锚定 → 契约 → 物化","确定性优先：碰撞落点由本地算法算出","先修后判：重锚定 → 65 项契约"]},{"dot":"blue","title":"分段校验","items":["整份方案拆成自洽块","逐块独立生成 + 校验","A/B：整份 0/32 vs 分段 23/25"]},{"dot":"rose","title":"零放行","items":["确定性校验器全部挡下","8 个跨域包对实测零放行","缺口自己列（needs_ai_fill）"]}]};
 
-<div class="features">
-  <div class="feature"><div class="ico">🔬</div><b>可核验</b><p>每条证据都是母包里的逐字引文，带文件、行号和 SHA-256。编造零容忍。</p></div>
-  <div class="feature"><div class="ico">🧩</div><b>分段校验</b><p>整份方案拆成自洽块，逐块本地校验，只重试失败的段。A/B 0/32 → 23/25。</p></div>
-  <div class="feature"><div class="ico">🏃</div><b>能跑得动</b><p>方案生成真实文件包，selftest 退出码判定。不冒充「比父本好」。</p></div>
-</div>
+const typeColors={start:'#3fb950',process:'#58a6ff',active:'#d29922',decision:'#bc8cff',success:'#3fb950',failure:'#f85149',output:'#d29922'};
+const stateMap={};DATA.states.forEach(s=>stateMap[s.id]=s);
+const COL_W=118,START_X=55,NODE_W=100,NODE_H=70,MAIN_Y=80,LANE_GAP=260;
 
-<div class="footer">
-  <span><b>AI 闪光点</b> · Skill 碰撞台 · V1.0.0</span>
-  <span><span class="badge green">660 tests passed</span><span class="badge blue">MIT License</span></span>
-</div>
+function render(viewId){
+  const view=DATA.meta.views.find(v=>v.id===viewId)||DATA.meta.views[0];
+  const focus=new Set(view.focus);
+  const svg=document.getElementById('chart');
+  let html='';
+
+  // Lane labels
+  html+=`<text x="20" y="${MAIN_Y-20}" fill="#8b949e" font-size="11" font-weight="600">${DATA.lanes[0].label}</text>`;
+  html+=`<text x="20" y="${MAIN_Y+LANE_GAP+10}" fill="#8b949e" font-size="11" font-weight="600">${DATA.lanes[1].label}</text>`;
+
+  // Transitions (arrows)
+  for(const t of DATA.transitions){
+    const from=stateMap[t.from],to=stateMap[t.to];
+    if(!focus.has(t.from)||!focus.has(t.to))continue;
+    const x1=START_X+from.col*COL_W+NODE_W+5,y1=MAIN_Y+(from.yOffset||0)+NODE_H/2;
+    const x2=START_X+to.col*COL_W-5,y2=MAIN_Y+(to.yOffset||0)+NODE_H/2;
+    const color=t.variant==='emphasis'?'#58a6ff':t.variant==='security'?'#f85149':'#30363d';
+    const width=t.variant==='emphasis'?2:1.2;
+    const dash=t.variant==='security'?'4,3':'';
+    html+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width}" stroke-dasharray="${dash}" marker-end="url(#arrow-${t.variant||'default'})"/>`;
+  }
+
+  // Arrow markers
+  html+=`<defs>
+    <marker id="arrow-default" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="none" stroke="#30363d" stroke-width="1.5"/></marker>
+    <marker id="arrow-emphasis" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="none" stroke="#58a6ff" stroke-width="1.5"/></marker>
+    <marker id="arrow-security" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="none" stroke="#f85149" stroke-width="1.5"/></marker>
+  </defs>`;
+
+  // Nodes
+  for(const s of DATA.states){
+    if(!focus.has(s.id))continue;
+    const x=START_X+s.col*COL_W,y=MAIN_Y+(s.yOffset||0);
+    const c=typeColors[s.type]||'#58a6ff';
+    const dim=!view.focus.includes(s.id);
+    const opacity=dim?0.35:1;
+    const strokeW=s.type==='active'||s.type==='start'?2.5:1.5;
+    html+=`<g opacity="${opacity}">`;
+    html+=`<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="12" fill="#161b22" stroke="${c}" stroke-width="${strokeW}"/>`;
+    html+=`<text x="${x+NODE_W/2}" y="${y+18}" text-anchor="middle" font-size="10" font-weight="700" fill="${c}">${s.step||s.tag}</text>`;
+    html+=`<text x="${x+NODE_W/2}" y="${y+36}" text-anchor="middle" font-size="12.5" font-weight="600" fill="#c9d1d9">${s.label}</text>`;
+    html+=`<text x="${x+NODE_W/2}" y="${y+54}" text-anchor="middle" font-size="9" fill="#8b949e">${s.sublabel||''}</text>`;
+    if(s.tag)html+=`<text x="${x+NODE_W/2}" y="${y+NODE_H+14}" text-anchor="middle" font-size="9" fill="${c}" opacity=".6">${s.tag}</text>`;
+    html+=`</g>`;
+  }
+
+  svg.innerHTML=html;
+
+  // Cards
+  const cardsEl=document.getElementById('cards');
+  cardsEl.innerHTML=DATA.cards.map(c=>`<div class="card"><h3><span class="dot ${c.dot}"></span>${c.title}</h3><ul>${c.items.map(i=>`<li>${i}</li>`).join('')}</ul></div>`).join('');
+}
+
+// Tabs
+const tabsEl=document.getElementById('tabs');
+DATA.meta.views.forEach((v,i)=>{
+  const btn=document.createElement('button');
+  btn.className='view-tab'+(i===0?' active':'');
+  btn.textContent=v.label;
+  btn.onclick=()=>{
+    document.querySelectorAll('.view-tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    render(v.id);
+  };
+  tabsEl.appendChild(btn);
+});
+
+render('pipeline');
+</script>
 </body>
 </html>
