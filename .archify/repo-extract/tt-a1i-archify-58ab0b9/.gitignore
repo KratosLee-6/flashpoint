@@ -1,0 +1,9 @@
+.DS_Store
+.harnessed/
+node_modules/
+.wrangler/
+.claude/
+.lore/
+/.impeccable/
+__pycache__/
+*.py[cod]
