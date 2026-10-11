@@ -99,7 +99,7 @@
 通过验收的方案生成真实文件包（脚本、模板、schema），再让包给自己出题——selftest 退出码判定「能不能跑得动」。
 
 <div align="center">
-<img src="marketing/04-对照数据.png" alt="0/32 vs 23/25" width="70%" />
+<img src="screenshots/实拍-02-快速碰撞面板.png" alt="快速碰撞面板" width="80%" />
 </div>
 
 ---
