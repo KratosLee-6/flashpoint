@@ -149,6 +149,33 @@ def unfence(text):
     return body
 
 
+def _exc_label(exc: Exception) -> str:
+    """把异常归到人能看懂的一类（中英并列，方便 grep）。
+
+    2026-10-21：改了错误文案之后，`TimeoutError: The read operation timed out`
+    **不含小写 'timeout'** —— 既让正则断言抓不到，也让用户看不出是超时。
+    所以类别词固定带英文小写名。
+    """
+    text = str(exc).lower()
+    if isinstance(exc, TimeoutError) or 'timed out' in text or 'timeout' in text:
+        return '超时/timeout'
+    if isinstance(exc, ConnectionError) or 'connection' in text or 'refused' in text:
+        return '连接失败/connection'
+    if isinstance(exc, UnicodeError):
+        return '编码错误/encoding'
+    return '其他/unknown'
+
+
+def _model_failure(exc: Exception) -> FusionError:
+    """模型请求失败的统一文案：**保留异常类型 + 可读类别 + 原文**。
+
+    旧文案把超时、连接被拒、编码错误三种完全不同的原因合并成一句英文
+    「Model connection/timeout/encoding failure」——据此调超时方向就调错了。
+    """
+    return FusionError('%s（%s）: %s'
+                        % (type(exc).__name__, _exc_label(exc), str(exc)[:300]))
+
+
 def parse_json(text):
     try:
         return json.loads(unfence(text), object_pairs_hook=_reject_duplicates,
@@ -731,7 +758,10 @@ def request_model(endpoint, api_key, body, timeout, protocol=None):
     except (OSError, UnicodeError, ValueError) as exc:
         if isinstance(exc, FusionError):
             raise
-        raise FusionError('Model connection/timeout/encoding failure; no automatic retry or fallback') from None
+        # 真因必须可见（2026-10-21 实测）：socket 超时是 OSError 的子类，
+        # 被这一句统一成「连接/超时/编码失败」后，超时、连接被拒、编码错误
+        # 三种完全不同的原因长得一模一样——机主据此调大超时方向就错了。
+        raise _model_failure(exc) from None
 
 
 THINKING_MODES = ('disabled', 'enabled', 'low', 'high', 'max')
@@ -808,7 +838,8 @@ def probe_model(endpoint, model, api_key='', allow_billable_probe=False, thinkin
 # 所以上限按「当前可用模型里最费的那个」定，并且**暴露给用户**：
 # 强思考型模型在本地/小模型上纯属浪费，8192 完全够用。
 MAX_TOKENS_MAX = 65536
-TIMEOUT_MAX = 600
+TIMEOUT_MAX = 900  # 600→900（2026-10-14）：编码计划的思考型模型(glm-5.3系)
+# 单次生成实测可超 600s——上限是防挂死守卫，不是产品语义
 
 #: function-call 承载时用的工具名（`carrier='tool'`）
 RESULT_TOOL_NAME = 'submit_fusion_review'
@@ -839,7 +870,8 @@ def result_tool():
 
 
 def chat_complete(wire, *, endpoint, model, api_key='', timeout=90, max_tokens=8192,
-                  thinking=None, json_mode=True, protocol=None, carrier='json'):
+                  thinking=None, json_mode=True, protocol=None, carrier='json',
+                  connect_retries=0):
     """**唯一的模型出入口**：按协议构造请求、发出去、解析回统一的形状。
 
     三个调用点（`synthesize` / `synthesize_fill` / `probe_model`）都走这里，
@@ -873,7 +905,18 @@ def chat_complete(wire, *, endpoint, model, api_key='', timeout=90, max_tokens=8
     headers, body, _ = providers.build_request(protocol, wire, model, max_tokens, extra,
                                              endpoint=endpoint)
     del headers                                   # 真 key 由 request_model 注入，不经这里
-    raw = request_model(endpoint, api_key, body, timeout, protocol)
+    # 窄域连接类重试（2026-10-14，默认关）：只重 OSError 合并类（连接断/超时），
+    # HTTP 状态错误（鉴权/配额/形状）照旧不重——那些重了也没用还烧钱。
+    # 实测依据：glm-5.3-flash 产物生成 2/2 死于该类（一次 15-19 分钟挂死），
+    # 小预算同任务 30s 稳定——瞬时挂死与预算相关，一次重试能救。
+    raw = None
+    for _attempt in range(1 + max(0, connect_retries)):
+        try:
+            raw = request_model(endpoint, api_key, body, timeout, protocol)
+            break
+        except FusionError as exc:
+            if 'connection/timeout/encoding' not in str(exc) or _attempt >= connect_retries:
+                raise
     try:
         parsed = providers.parse_response(protocol, raw)
     except ValueError as exc:
@@ -1299,6 +1342,39 @@ def _synthesize_segmented(packet, *, endpoint, model, api_key='', timeout=90, ma
             'context_selection': deepcopy(packet['context_selection']), 'context_coverage': coverage_report(packet),
             'direction_policy_sha256': packet['rule_directions']['policy_sha256'],
             'spark': spark_assess(result, packet.get('capability')), 'result': result}
+
+
+def segment_probe(packet, *, endpoint, model, api_key='', timeout=90, max_tokens=8192,
+                  thinking=None, protocol=None, count_brief=False) -> dict:
+    """分段适配探测（2026-10-12，机主裁定「分段按自适应 + 前置探测门控」）。
+
+    只跑第一个段（profiles:A——引文最密、最先暴露引文保真度问题的一块）的
+    **一轮**生成 → 段级重锚定 → 确定性校验，回答「该模型当前能否产出契约合格的段」。
+    背景：M3 导航批实测分段 0/4 而整份 1/4——分段收益是**模型条件性的**
+    （glm-4.5-air 23/25 vs 整份 0/32；M3 反向），所以模式选择前先花一次调用探路。
+
+    一次模型调用、**无重试**（带重试就不是便宜的门了）；探测只做模式选择，
+    不产出任何内容、不代替最终验收——正式运行仍走同一条验收链。
+    """
+    started = time.monotonic()
+    base_wire = messages(packet, with_skeleton=True, count_brief=count_brief)
+    seg = segments.blocks(packet)[0]
+    wire = segments.block_wire(base_wire, packet, seg, [])
+    reply = chat_complete(wire, endpoint=endpoint, model=model, api_key=api_key,
+                          timeout=timeout, max_tokens=max_tokens, thinking=thinking,
+                          protocol=protocol)
+    item, issues = _segment_attempt(reply, packet, seg)
+    anchor_report = None
+    if item is not None:
+        # 与正式分段同序：先重锚定再校验——重锚定能修的转写缺陷不算模型失败。
+        anchor_report = _segment_reanchor(item, seg, packet)
+        _segment_infer_artifacts(item, seg)
+        issues = segments.segment_issues(item, packet, seg)
+    return {'ok': not issues, 'segment': seg['tag'],
+            'issues': [str(i)[:160] for i in issues[:5]],
+            'reanchor_fixed': anchor_report['fixed'] if anchor_report else 0,
+            'reanchor_unfixed': len(anchor_report['rejected']) if anchor_report else 0,
+            'elapsed_seconds': round(time.monotonic() - started, 1)}
 
 
 def read_packet(path):

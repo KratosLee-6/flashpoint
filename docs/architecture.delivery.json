@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "355a78a9-074c-4ffa-b8c9-2d48f9a8ef2a",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "E:\\工作\\【汐构科技】\\客户跟进\\AI闪光点public\\.archify\\flashpoint.architecture.json",
+  "output": "E:\\工作\\【汐构科技】\\客户跟进\\AI闪光点public\\docs\\architecture.html",
+  "specification": {
+    "sha256": "5d9386934a12762c510fcb5a670c4d92a0d987ee4c2dc6a60b2d083dbc325393",
+    "bytes": 6456
+  },
+  "artifact": {
+    "sha256": "cb350f080b908320d49c7a00f656351460b2a6d689e1e1146abfefff79ca5177",
+    "bytes": 767059
+  }
+}

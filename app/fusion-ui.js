@@ -3,6 +3,7 @@
   'use strict';
   const esc=v=>window.Spark.escape(String(v??''));
   const state={token:'',connected:false,explorationSupported:false,uploadsSupported:false,reviewsSupported:false,uploads:{A:null,B:null},busy:false,pending:false,mode:'expert',packSources:[],message:'连接本机服务后开始。',error:'',goalError:'',prepared:null,inventory:null,selection:null,importedReview:null,source:null,probe:null,contextDirty:false,request:null,result:null,job:null,saved:false,materializeReport:null,materializeBusy:null,documents:null,
+    skillhub:{query:'',busy:false,downloading:null,results:null,error:'',message:''},
     form:{a:'',b:'',resourcesA:'',resourcesB:'',gapsA:'',gapsB:'',goal:'',budget:'160000',provider:'',endpoint:'',model:'',thinking:''}};
   let saveResult=null,connecting=false,transientKey='',busyFocusAction=null,recoveryRead=false,recoveryWarning='',pollTimer=null;
   // 融合服务地址基址：浏览器（启动脚本）走同源空串；桌面壳走 sidecar 端口，端口由 Rust 单一源提供。
@@ -66,7 +67,12 @@
   function mounts(value){return lines(value).map(line=>{const i=line.indexOf('=');if(i<1)throw Error('关联资源请按“包内路径 = 本机文件或目录路径”填写，每行一项');return {mount:line.slice(0,i).trim(),path:line.slice(i+1).trim()}})}
   async function api(action,body){
     if(apiBase===null)throw Error('本机融合服务尚未就绪，请先连接本机服务。');
-    const response=await fetch(apiBase+'/api/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-Spark-Token':state.token},body:JSON.stringify(body),cache:'no-store'});
+    // ack 类请求都有界：挂死的 socket 不许把表单永久锁死（2026-10-12 实机验收发现
+    // ack 丢失时 quick-run 永远等待）。超时抛错后走 request_id 恢复路径——
+    // 任务若还在跑，轮询按请求编号找回；若已失败，如实上报。
+    const limits={run:30000,packages:60000,documents:60000,'skillhub/search':30000};
+    const signal=AbortSignal.timeout(limits[action]??20000);
+    const response=await fetch(apiBase+'/api/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-Spark-Token':state.token},body:JSON.stringify(body),cache:'no-store',signal});
     let data;try{data=await response.json()}catch{throw Error('本机融合服务不可用，请通过启动脚本或桌面版打开 App')}
     if(!response.ok)throw Object.assign(Error(data.error?.startsWith('Context budget exceeded')?'完整请求超出字符预算，未截断也未发送。请先审查各文件正文及取舍理由，不要用扩大预算代替审查。':(data.error||'请求未完成')),{status:response.status});return data;
   }
@@ -187,8 +193,20 @@
   function materializeView(orientation){
     const busy=state.materializeBusy===orientation;
     const report=state.materializeReport&&state.materializeReport.orientation===orientation?state.materializeReport:null;
-    const verdict=report?`<p><b>可运行：${report.runnable?'是':'否'}</b> · selftest 退出码 ${esc(String(report.selftest?.exit_code))}</p><p class="fusion-note">包体目录：<code>${esc(report.package_dir)}</code></p>${report.selftest?.stdout_tail?`<p class="fusion-note">自测输出：${esc(report.selftest.stdout_tail)}</p>`:''}${report.fix_rounds?.length?`<p class="fusion-note">修复回路：${report.fix_rounds.length} 轮（真实 traceback 定点修补）</p>`:''}<p class="fusion-note">${esc(report.value_note||'')}</p>`:'';
+    const checks=report&&Array.isArray(report.selftest?.checks)?report.selftest.checks:[];
+    // 3c（45 号文批次）：selftest 按协议逐项自报通过/失败；旧包没有协议行时
+    // 如实回退为整体输出，绝不把「没有逐项结果」画成「全部通过」。
+    const checksView=checks.length?`<ul class="fusion-selftest-checks">${checks.map(c=>`<li class="${c.passed?'check-ok':'check-fail'}"><span aria-hidden="true">${c.passed?'✓':'✗'}</span> ${esc(c.name)}${!c.passed&&c.detail?`<span class="fusion-note"> · ${esc(c.detail)}</span>`:''}</li>`).join('')}</ul><p class="fusion-note">逐项结果由 selftest 自报；可运行与否仍以退出码为准。</p>`:'';
+    const output=report.selftest?.stdout_tail?`<details class="fusion-selftest-raw"><summary>selftest 原始输出（尾部）</summary><pre>${esc(report.selftest.stdout_tail)}</pre></details>`:'';
+    const verdict=report?`<p><b>可运行：${report.runnable?'是':'否'}</b> · selftest 退出码 ${esc(String(report.selftest?.exit_code))}</p><p class="fusion-note">包体目录：<code>${esc(report.package_dir)}</code></p>${checksView}${output}${report.fix_rounds?.length?`<p class="fusion-note">修复回路：${report.fix_rounds.length} 轮（真实 traceback 定点修补）</p>`:''}<p class="fusion-note">${esc(report.value_note||'')}</p>`:'';
     return `<div class="fusion-materialize"><p class="fusion-note">物化＝把本方案生成真实文件包并运行自测——回答「能不能跑得动」；不证明「比父本好」。</p><label class="fusion-consent"><input id="fusion-materialize-consent" type="checkbox" ${busy||state.pending?'disabled':''}>我同意物化会再次发送材料并可能产生费用</label><button class="btn subtle" data-fusion="materialize" data-orientation="${esc(orientation)}" ${busy||state.pending?'disabled':''}>${busy?'正在物化并自测…':'物化并自测'}</button>${verdict}</div>`;
+  }
+  function skillhubView(target){
+    // 3d（45 号文批次）：在线搜索 SkillHub 包源并下载到本机下载区。
+    // 诚实边界：只访问 api.skillhub.cn；不发送用户材料、不调用模型、不产生费用。
+    const s=state.skillhub,disabled=s.busy||s.downloading?'disabled':'';
+    const rows=s.results===null?'':(s.results.length?s.results.map(r=>`<li><div class="fusion-skillhub-meta"><b>${esc(r.name)}</b> <span class="fusion-note">${esc(r.version||'—')} · ${r.downloads==null?'下载量未知':r.downloads+' 次下载'}${r.verified?' · 已认证':''}</span><p class="fusion-note">${esc(r.description||'（无描述）')}</p></div><button class="btn subtle" data-fusion="skillhub-download" data-slug="${esc(r.slug)}" data-target="${esc(target)}" ${disabled||!state.connected?'disabled':''}>${s.downloading===r.slug?'下载中…':'下载到本机'}</button></li>`).join(''):'<li class="fusion-note">没有匹配的包；换个关键词再试，或直接用本地 curated 包源。</li>');
+    return `<details class="fusion-skillhub"><summary>SkillHub 在线搜索：按关键词找包并下载</summary><p class="fusion-note">搜索与下载只访问 api.skillhub.cn；包体落到本机下载区（不进仓库），只读取不执行。下载不发送你的任何材料，不调用模型，不产生费用；完成后包会出现在 A/B 输入的下拉里。</p>${s.error?`<p class="fusion-error" role="alert">${esc(s.error)}</p>`:''}<div class="fusion-skillhub-bar"><input id="fusion-skillhub-query" value="${esc(s.query)}" placeholder="关键词，如 防骗 / 文档 / 评测 / 编程" autocomplete="off" ${disabled}><button class="btn subtle" data-fusion="skillhub-search" data-target="${esc(target)}" ${disabled||!state.connected?'disabled':''}>${s.busy?'搜索中…':'搜索'}</button></div><ul class="fusion-skillhub-list">${rows}</ul>${s.message?`<p class="fusion-note">${esc(s.message)}</p>`:''}</details>`;
   }
   function candidateView(candidate){
     const orientations={A:'增强 A 的原场景',B:'增强 B 的原场景',C:'形成独立新场景'};
@@ -492,12 +510,12 @@
     if(state.mode==='quick'){
       // **快速碰撞**：选两个包 → 单次确认 → 自动精简 + 融合。专家模式一键切回。
       const modes=`<div class="fusion-actions" style="margin:0 0 12px"><button class="btn subtle" data-fusion="set-mode" data-mode="quick">快速碰撞（选两个包即可）</button><button class="btn subtle" data-fusion="set-mode" data-mode="expert">专家模式 ✓</button></div>`;
-      host.innerHTML=`<div class="page fusion-page"><datalist id="fusion-pack-sources">${(state.packSources||[]).map(p=>`<option value="${esc(p.path)}">${esc(p.name+' · '+(p.source==='skillhub'?'SkillHub':'本地'))}</option>`).join('')}</datalist><header class="fusion-header"><span class="eyebrow">SKILL FUSION / 模型融合</span><h1>从两种能力，<br><span>找到新的可能。</span></h1>${modes}</header><div id="fusion-status" class="fusion-status" tabindex="-1" role="status" aria-live="polite" ${state.pending?'aria-busy="true"':''}>${esc(state.message)}</div>${state.error?`<p class="fusion-error" role="alert">${esc(state.error)}</p>`:''}${!state.connected?'<button class="btn subtle" data-fusion="connect">重新连接本机服务</button>':''}<section class="fusion-panel fusion-quick"><canvas class="fusion-aurora" aria-hidden="true"></canvas><div class="fusion-quick-body"><span class="eyebrow">QUICK COLLISION / 快速碰撞</span><h2>选两个包，其余自动</h2><p class="fusion-note">自动精简上下文（SKILL.md 必留，逐文件留痕）；模型与接口来自「数据与偏好 → 调用模型」。审查轨迹全部保留，可随时切到专家模式逐步审查。</p><div class="fusion-grid">${field('quick-a','Skill A（路径，或下拉选择包源）','可下拉：本地 curated / SkillHub 包源')}${field('quick-b','Skill B','同上')}</div>${field('quick-goal','偏好或限制（选填）','留空＝自由探索，不预设结果',true)}<label class="fusion-field" for="fusion-thinking"><span>推理（MiniMax-M3 建议关闭；始终思考型模型必选强度）</span><select id="fusion-thinking" data-fusion-field="thinking" ${state.busy||state.pending?'disabled':''}><option value="" ${!state.form.thinking?'selected':''}>按服务商默认</option><option value="disabled" ${state.form.thinking==='disabled'?'selected':''}>关闭推理（推荐）</option><option value="enabled" ${state.form.thinking==='enabled'?'selected':''}>开启推理</option><option value="low" ${state.form.thinking==='low'?'selected':''}>推理强度 · 低</option><option value="high" ${state.form.thinking==='high'?'selected':''}>推理强度 · 中</option><option value="max" ${state.form.thinking==='max'?'selected':''}>推理强度 · 高</option></select></label><label class="fusion-consent"><input id="fusion-quick-consent" type="checkbox" ${state.busy||state.pending?'disabled':''}>我确认：碰撞会把所选材料发送给我配置的模型，并可能产生费用</label><div class="fusion-actions"><button class="btn primary" data-fusion="quick-run" ${!state.connected||state.busy||state.pending?'disabled':''}>${state.pending?'碰撞进行中…':'开始碰撞'}</button></div><p class="fusion-note">碰撞产出的是方案（不是已经运行的程序）；方案审查页可对每个候选「物化并自测」——生成真实文件包并运行自测，回答「能不能跑得动」。</p></div></section>${state.result?results():''}${state.pending?'<p class="fusion-note">模型判断通常需要几分钟；可以切页面，回来这里看进度。</p>':''}</div>`;
+      host.innerHTML=`<div class="page fusion-page"><datalist id="fusion-pack-sources">${(state.packSources||[]).map(p=>`<option value="${esc(p.path)}">${esc(p.name+' · '+(p.source==='skillhub'?'SkillHub':'本地'))}</option>`).join('')}</datalist><header class="fusion-header"><span class="eyebrow">SKILL FUSION / 模型融合</span><h1>从两种能力，<br><span>找到新的可能。</span></h1>${modes}</header><div id="fusion-status" class="fusion-status" tabindex="-1" role="status" aria-live="polite" ${state.pending?'aria-busy="true"':''}>${esc(state.message)}</div>${state.error?`<p class="fusion-error" role="alert">${esc(state.error)}</p>`:''}${!state.connected?'<button class="btn subtle" data-fusion="connect">重新连接本机服务</button>':''}<section class="fusion-panel fusion-quick"><canvas class="fusion-aurora" aria-hidden="true"></canvas><div class="fusion-quick-body"><span class="eyebrow">QUICK COLLISION / 快速碰撞</span><h2>选两个包，其余自动</h2><p class="fusion-note">自动精简上下文（SKILL.md 必留，逐文件留痕）；模型与接口来自「数据与偏好 → 调用模型」。审查轨迹全部保留，可随时切到专家模式逐步审查。</p><div class="fusion-grid">${field('quick-a','Skill A（路径，或下拉选择包源）','可下拉：本地 curated / SkillHub 包源')}${field('quick-b','Skill B','同上')}</div>${skillhubView('quick-a')}${field('quick-goal','偏好或限制（选填）','留空＝自由探索，不预设结果',true)}<label class="fusion-field" for="fusion-thinking"><span>推理（MiniMax-M3 建议关闭；始终思考型模型必选强度）</span><select id="fusion-thinking" data-fusion-field="thinking" ${state.busy||state.pending?'disabled':''}><option value="" ${!state.form.thinking?'selected':''}>按服务商默认</option><option value="disabled" ${state.form.thinking==='disabled'?'selected':''}>关闭推理（推荐）</option><option value="enabled" ${state.form.thinking==='enabled'?'selected':''}>开启推理</option><option value="low" ${state.form.thinking==='low'?'selected':''}>推理强度 · 低</option><option value="high" ${state.form.thinking==='high'?'selected':''}>推理强度 · 中</option><option value="max" ${state.form.thinking==='max'?'selected':''}>推理强度 · 高</option></select></label><label class="fusion-consent"><input id="fusion-quick-consent" type="checkbox" ${state.busy||state.pending?'disabled':''}>我确认：碰撞会把所选材料发送给我配置的模型，并可能产生费用</label><div class="fusion-actions"><button class="btn primary" data-fusion="quick-run" ${!state.connected||state.busy||state.pending?'disabled':''}>${state.pending?'碰撞进行中…':'开始碰撞'}</button></div><p class="fusion-note">碰撞产出的是方案（不是已经运行的程序）；方案审查页可对每个候选「物化并自测」——生成真实文件包并运行自测，回答「能不能跑得动」。</p></div></section>${state.result?results():''}${state.pending?'<p class="fusion-note">模型判断通常需要几分钟；可以切页面，回来这里看进度。</p>':''}</div>`;
       if(window.SparkFX&&window.SparkFX.aurora)window.SparkFX.aurora(root().querySelector('.fusion-aurora'));
       for(const p of ['quick-a','quick-b'])host.querySelector('#fusion-'+p)?.setAttribute('list','fusion-pack-sources');
       return;
     }
-    host.innerHTML=`<div class="page fusion-page"><datalist id="fusion-pack-sources">${(state.packSources||[]).map(p=>`<option value="${esc(p.path)}">${esc(p.name+' · '+(p.source==='skillhub'?'SkillHub':'本地'))}</option>`).join('')}</datalist><header class="fusion-header"><span class="eyebrow">SKILL FUSION / 模型融合</span><h1>从两种能力，<br><span>找到新的可能。</span></h1><p>带上完整材料，先看方向，再让模型解释双方如何产生新的作用。</p><ol class="fusion-steps" aria-label="融合步骤"><li class="active">1 材料</li><li class="${state.prepared?'active':''}">2 方向</li><li class="${state.pending?'active':''}">3 模型判断</li><li class="${state.result?'active':''}">4 方案审查</li></ol><div class="fusion-actions" style="margin:14px 0 0"><button class="btn subtle" data-fusion="set-mode" data-mode="quick">快速碰撞（选两个包即可）</button><button class="btn subtle" disabled>专家模式 ✓</button></div></header><div id="fusion-status" class="fusion-status" tabindex="-1" role="status" aria-live="polite" ${state.pending?'aria-busy="true"':''}>${esc(state.message)}</div>${state.error?`<p class="fusion-error" role="alert">${esc(state.error)}</p>`:''}${!state.connected?'<button class="btn subtle" data-fusion="connect">重新连接本机服务</button>':''}<section class="fusion-panel"><span class="eyebrow">01 / SOURCE MATERIALS</span><h2>完整材料，才有理解的基础</h2><p>填写本机 Skill 目录或 ZIP 路径${(state.packSources||[]).length?'；输入框可下拉选择本地 curated 包或已下载的 SkillHub 包':''}。目录内需要 SKILL.md，脚本只读取，不会执行。</p><div class="fusion-grid">${['A','B'].map(p=>`<article>${field(p.toLowerCase(),'Skill '+p+' 路径','C:\\Skills\\'+p)}${field('resources'+p,p+' 的关联资源（可选）','lib = C:\\Project\\lib\nprompts-data.js = C:\\Project\\prompts-data.js',true)}<p class="fusion-note">每行：包内路径 = 本机文件或目录路径。只读取明确关联的资源。</p>${field('gaps'+p,p+' 的已知缺口（可选）','每行一项，模型必须保留',true)}</article>`).join('')}</div>${field('goal','偏好或限制（选填）','不知道也可以留空；例如：优先探索学习场景，或只使用本地工具。',true)}${field('budget','请求字符预算（1000–1000000）','160000')}<p class="fusion-note">全量清点后再审查发送范围；所选正文超预算会阻断发送，不会截断材料。字符数不等于 token 数，请根据所用模型的上下文容量设置。</p><button class="btn primary" data-fusion="prepare" ${!state.connected||state.busy||state.pending?'disabled':''}>${state.busy?'正在处理…':'读取完整材料清单'}</button></section>${materials()}${model()}${results()}</div>`;
+    host.innerHTML=`<div class="page fusion-page"><datalist id="fusion-pack-sources">${(state.packSources||[]).map(p=>`<option value="${esc(p.path)}">${esc(p.name+' · '+(p.source==='skillhub'?'SkillHub':'本地'))}</option>`).join('')}</datalist><header class="fusion-header"><span class="eyebrow">SKILL FUSION / 模型融合</span><h1>从两种能力，<br><span>找到新的可能。</span></h1><p>带上完整材料，先看方向，再让模型解释双方如何产生新的作用。</p><ol class="fusion-steps" aria-label="融合步骤"><li class="active">1 材料</li><li class="${state.prepared?'active':''}">2 方向</li><li class="${state.pending?'active':''}">3 模型判断</li><li class="${state.result?'active':''}">4 方案审查</li></ol><div class="fusion-actions" style="margin:14px 0 0"><button class="btn subtle" data-fusion="set-mode" data-mode="quick">快速碰撞（选两个包即可）</button><button class="btn subtle" disabled>专家模式 ✓</button></div></header><div id="fusion-status" class="fusion-status" tabindex="-1" role="status" aria-live="polite" ${state.pending?'aria-busy="true"':''}>${esc(state.message)}</div>${state.error?`<p class="fusion-error" role="alert">${esc(state.error)}</p>`:''}${!state.connected?'<button class="btn subtle" data-fusion="connect">重新连接本机服务</button>':''}<section class="fusion-panel"><span class="eyebrow">01 / SOURCE MATERIALS</span><h2>完整材料，才有理解的基础</h2><p>填写本机 Skill 目录或 ZIP 路径${(state.packSources||[]).length?'；输入框可下拉选择本地 curated 包或已下载的 SkillHub 包':''}。目录内需要 SKILL.md，脚本只读取，不会执行。</p><div class="fusion-grid">${['A','B'].map(p=>`<article>${field(p.toLowerCase(),'Skill '+p+' 路径','C:\\Skills\\'+p)}${field('resources'+p,p+' 的关联资源（可选）','lib = C:\\Project\\lib\nprompts-data.js = C:\\Project\\prompts-data.js',true)}<p class="fusion-note">每行：包内路径 = 本机文件或目录路径。只读取明确关联的资源。</p>${field('gaps'+p,p+' 的已知缺口（可选）','每行一项，模型必须保留',true)}</article>`).join('')}</div>${skillhubView('a')}${field('goal','偏好或限制（选填）','不知道也可以留空；例如：优先探索学习场景，或只使用本地工具。',true)}${field('budget','请求字符预算（1000–1000000）','160000')}<p class="fusion-note">全量清点后再审查发送范围；所选正文超预算会阻断发送，不会截断材料。字符数不等于 token 数，请根据所用模型的上下文容量设置。</p><button class="btn primary" data-fusion="prepare" ${!state.connected||state.busy||state.pending?'disabled':''}>${state.busy?'正在处理…':'读取完整材料清单'}</button></section>${materials()}${model()}${results()}</div>`;
     for(const p of ['a','b'])host.querySelector('#fusion-'+p)?.setAttribute('list','fusion-pack-sources');
     host.querySelector('.fusion-header h1').outerHTML='<h2>两个 Skill，形成怎样的新能力？</h2>';
     host.querySelector('.fusion-header p').textContent='后端依次核查材料、提取双方能力、审查互补与冲突，再给出目标、机制、流程和验收条件。模型只辅助分析，不是被融合的对象。';
@@ -533,6 +551,7 @@
     if(target){target.focus({preventScroll:true});if(selection&&target.setSelectionRange)target.setSelectionRange(...selection)}
     host.onclick=e=>{const button=e.target.closest('[data-fusion]');if(button&&!button.disabled)action(button.dataset.fusion,button.dataset)};
     host.oninput=e=>{
+      if(e.target.id==='fusion-skillhub-query')state.skillhub.query=e.target.value;
       if(e.target.dataset.contextParent){
         const row=state.selection[e.target.dataset.contextParent].find(item=>item.path===e.target.dataset.contextPath);
         if(e.target.type==='checkbox')row.include=e.target.checked;else row[e.target.dataset.contextField||'reason']=e.target.value;
@@ -620,6 +639,8 @@
       state.job=sent.id;state.message='已发送给模型；你可以切换页面或刷新，回到这里查看进度。';schedulePoll(800);paint();
     }
     if(state.busy)return;
+    if(name==='skillhub-search'){await skillhubSearch();return;}
+    if(name==='skillhub-download'){await skillhubDownload(options.slug,options.target);return;}
     if(name==='pick-package'){
       if(!state.pending)root().querySelector(`#fusion-${options.kind==='zip'?'zip':'folder'}-${options.parent}`).click();
       return;
@@ -693,7 +714,10 @@
         state.busy=true;paint();state.source=await api('source',{inventory_sha256:state.inventory.inventory_sha256,parent:options.parent,path:options.path,offset:Number(options.offset||0)});
       }else if(name==='preflight'){
         if(!root()?.querySelector('#fusion-probe-consent')?.checked)throw Error('请先确认连接检查可能产生费用');
-        const key=resolveKey(state.form.endpoint);transientKey='';state.probe=null;state.busy=true;paint();
+        // 探测**不能消费**临时密钥：2026-10-21 实测发现，这里清掉 transientKey 后，
+        // 后续 run 再取密钥就只剩「数据与偏好」里保存的那份——用户在表单里临时填的密钥
+        // 会让「连接探测 → 发送」这条主路径必然失败（且错误被 catch 分支误报成网络问题）。
+        const key=resolveKey(state.form.endpoint);state.probe=null;state.busy=true;paint();
         state.probe=await api('preflight',{endpoint:state.form.endpoint,model:state.form.model,api_key:key,allow_billable_probe:true,thinking:state.form.thinking||null});
         state.message='基础连接检查通过，未发送技能材料；请单独审查并授权完整请求。';      }else if(name==='preview'){
         state.busy=true;state.request=await api('preview',{packet_sha256:state.prepared.packet_sha256});state.message='完整请求已展开，检查后再允许发送。';
@@ -738,10 +762,44 @@
       }else if(name==='export'){
         const url=URL.createObjectURL(new Blob([JSON.stringify(state.result,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='skill-fusion-proposal.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
       }
-    }catch(e){state.error=e.message||'操作未完成';if(name==='run'){
-        if(e.status){state.pending=false;forgetJob();}
-        else{state.message='发送回执未收到，正在按请求编号查询原任务；不会自动重复发送。';schedulePoll(500);}
+    }catch(e){state.error=e.message||'操作未完成';if(name==='run'||name==='quick-run'){
+      // 快速碰撞与专家模式同一恢复语义（2026-10-12 实机验收发现：quick-run 抛错时
+      // pending 卡死、表单整体禁用直到刷新——库存/发送阶段的失败同样走这里）。
+      if(e.status){state.pending=false;forgetJob();}
+      else if(e.name==='AbortError'||e.name==='TypeError'){
+        // 只有真正的网络中断/超时才走「按编号找回原任务」；业务错误（如密钥缺失、
+        // 材料快照过期）必须原样显示，否则用户看到的是一句与真因无关的假网络错误
+        //（2026-10-21 实测：canSend() 抛的 Error 没有 status，被误报成「发送回执未收到」，
+        //  真实原因「请填写密钥」被完全盖住）。
+        state.message='发送回执未收到，正在按编号查询原任务；不会自动重复发送。';schedulePoll(500);}
+      else{state.pending=false;state.message=e.message||'操作未完成';}
       }}finally{state.busy=false;paint()}
+  }
+  async function skillhubSearch(){
+    const s=state.skillhub;
+    s.query=root().querySelector('#fusion-skillhub-query')?.value??s.query;
+    s.busy=true;s.error='';s.results=null;s.message='';paint();
+    try{
+      s.results=(await api('skillhub/search',{query:s.query})).skills;
+      s.message=s.results.length?'搜索完成。下载会落到本机下载区，不产生模型费用。':'本页没有匹配结果；可换关键词再试。';
+    }catch(e){s.error=e.message||'搜索失败，请检查网络后重试';}
+    finally{s.busy=false;paint()}
+  }
+  async function skillhubDownload(slug,target){
+    const s=state.skillhub;
+    if(!slug)return;
+    s.downloading=slug;s.error='';s.message='正在下载到本机下载区（逐文件校验 SHA-256），大包可能需要几十秒…';paint();
+    try{
+      const job=await api('skillhub/download',{slug});
+      let status=job;
+      while(status.status==='running'){await new Promise(r=>setTimeout(r,1200));status=await api('job',{id:job.id});}
+      if(status.status==='completed'){
+        s.message=`下载完成：${status.result.files} 个文件、${status.result.bytes} 字节已校验落盘，包源下拉已更新。`;
+        if(status.result.path&&['a','b','quick-a','quick-b'].includes(target))state.form[target]=status.result.path;
+        api('sources',{}).then(d=>{state.packSources=d.packs||[];paint()}).catch(()=>{});
+      }else{s.error=status.error||'下载失败';s.message='下载失败，未产生可用包体；可重试或改用本地 curated 包源。';}
+    }catch(e){s.error=e.message||'下载失败，请检查网络后重试';}
+    finally{s.downloading=null;paint()}
   }
   async function poll(){
     const id=state.job;if(!id||!state.pending)return;

@@ -123,26 +123,85 @@ def auto_selection(packet: dict, budget: int = 30000) -> dict:
 
     与 `validate_selection` 同一条硬约束：根 SKILL.md 必留、逐文件表态、
     角色取自 classification——**没有放宽任何校验**。
+
+    ⚠️ **预算语义（2026-10-20 修正）**：`budget` 是**两包共享的总预算**，
+    单位是**字符**（与 `context_limit_chars` 同尺度）。
+
+    原实现有三个错，叠加后必然超预算（实测：两个包共 107 个文件，
+    正文只入选 74K 字符，但最终 request 达 240K 字符 → 「Context budget
+    exceeded」）：
+
+    ① 预算**每包各算一次**（`used` 在包循环里重置）→ 实际是 2×budget；
+    ② 只累加**正文字节**，单位与 `context_limit_chars`（字符）不一致；
+    ③ 只算正文，**不算固定开销**——107 条 selection 记录（每条含 path + role +
+       两条 reason）+ 每文件元数据 + answer_template + system prompt，
+       实测合计约 **159K 字符**，与正文无关。估不出来，只能**量**。
+
+    修法：先按预算选，再用 `messages()` **实量**实际发送量；超了就从
+    「体积最大的已选正文文件」开始逐个剔除，直到装得下（SKILL.md 永不剔除）。
+    这是「量出来再缩」，不是「估一个系数」——估的系数一定会错。
     """
-    from .engine import select_context
+    from .engine import messages, select_context
 
     selection = {}
+    used = 0                      # **两包共享**（原实现每包重置 → 2×预算）
     for parent, package in packet['packages'].items():
         text = [e for e in package['files'] if e['status'] == 'text']
-        rows, used = [], 0
+        rows = []
         for entry in sorted(text, key=lambda e: (e['path'] != 'SKILL.md', e.get('bytes') or 0)):
             role, why = classification(entry)
             is_entry = entry['path'] == 'SKILL.md'
-            fits = is_entry or used + (entry.get('bytes') or 0) <= budget
-            if fits and not is_entry:
-                used += entry.get('bytes') or 0
+            cost = body_characters(entry)
+            fits = is_entry or used + cost <= budget
+            if fits:
+                used += cost
             rows.append({'path': entry['path'], 'include': fits, 'role': role,
                          'classification_reason': why,
                          'reason': ('入口文件必留' if is_entry else
                                     ('快速模式：预算内保留正文' if fits else
                                      '快速模式：超预算省略，未读取不得声称已读'))})
         selection[parent] = rows
-    return select_context(packet, selection)
+
+    packet = select_context(packet, selection)
+
+    # ── 量出来再缩：超了就剔最大的已选正文文件，直到装得下 ──
+    # ⚠️ 每轮都从**同一个原始包**重新 select_context（它每次 deepcopy 并重算 sha，
+    #    拿上一轮的返回值再调会撞 verify_packet 的「Prepared packet changed」）。
+    base = packet
+    limit = base.get('context_limit_chars') or 0
+    current = dict(selection)
+    for _ in range(200):                       # 上限：文件总数级
+        try:
+            wire = messages(current_packet := select_context(base, current),
+                            enforce_budget=False)
+        except Exception:
+            break
+        total = sum(len(m['content']) for m in wire)
+        if not limit or total <= limit:
+            packet = current_packet
+            break
+        # 找出「已选且非 SKILL.md」里正文最大的那个
+        victim = None
+        victim_cost = -1
+        for parent, package in base['packages'].items():
+            chosen = {r['path'] for r in current[parent] if r['include']}
+            for entry in package['files']:
+                if entry['path'] in chosen and entry['path'] != 'SKILL.md':
+                    cost = body_characters(entry)
+                    if cost > victim_cost:
+                        victim, victim_cost = (parent, entry['path']), cost
+        if victim is None:
+            packet = current_packet
+            break                               # 只剩 SKILL.md 还超 → 交给上层报错
+        parent, path = victim
+        for row in current[parent]:
+            if row['path'] == path:
+                row['include'] = False
+                row['reason'] = '快速模式：整体 context 超限，剔除本文件（未读取不得声称已读）'
+                break
+    else:
+        packet = select_context(base, current)
+    return packet
 
 
 def coverage_report(packet):

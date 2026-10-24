@@ -13,8 +13,11 @@ import webbrowser
 from urllib.parse import urlsplit
 
 from .engine import (prepare, preview, messages, synthesize, synthesize_fill, parse_json, check_endpoint,
-                     inspect_packages, inspect_documents, select_context, probe_model)
-from .materialize import materialize_candidate
+                     inspect_packages, inspect_documents, select_context, probe_model, _exc_label)
+from .materialize import materialize_candidate, materialize_verdict
+from .engine import segment_probe
+from .skillhub import download as skillhub_download
+from .skillhub import search as skillhub_search
 from .context import auto_selection, source_excerpt
 from .deliverables import Deliverables, Download
 from .fill import build_messages
@@ -97,6 +100,29 @@ class Workspace:
                 # 包源清单：本地 curated 目录 + SkillHub 下载区（仓库外）。
                 # 只列名称与描述，供 A/B 路径输入的下拉选择；不读取正文。
                 return {'packs': source_packs()}
+            if route == 'skillhub/search':
+                # 45 号文批次 3d：在线搜索（只访问 api.skillhub.cn，同步一次
+                # GET；不出站用户材料，不调用模型）。
+                if self.running:
+                    raise FusionError('已有模型请求进行中，请等待结束后再搜索包源')
+                return skillhub_search(body.get('query', ''), body.get('page', 1),
+                                       body.get('page_size', 20))
+            if route == 'skillhub/download':
+                # 在线下载整包到本机下载区（%LOCALAPPDATA%/flashpoint/skillhub-packs）。
+                # 逐文件 sha256 校验；下载在后台线程跑（大包可能要几十秒），
+                # 走与物化相同的 job 轮询。
+                slug = body.get('slug')
+                if not isinstance(slug, str) or not slug.strip():
+                    raise FusionError('请指明要下载的 SkillHub 包（slug）')
+                if self.running:
+                    raise FusionError('已有模型请求进行中，不能同时下载包源')
+                self.request_identity = ('skillhub-download', slug.strip())
+                self.job = {'id': secrets.token_hex(12), 'status': 'running',
+                            'result': None, 'error': None, 'kind': 'skillhub-download'}
+                self.running = True
+                threading.Thread(target=self._skillhub_download,
+                                 args=(slug.strip(), self.job), daemon=True).start()
+                return {'id': self.job['id'], 'status': 'running'}
             if route == 'reviews':
                 if body:
                     raise FusionError('证据列表不接受路径参数')
@@ -287,16 +313,45 @@ class Workspace:
         # （2026-10-07）：「能跑得动就说明是正常的」——只回答「跑不跑得动」。
         try:
             workroot = Path(self.deliverables.root).parent / 'materialize'
+            # 物化也要用可配超时（2026-10-21 实测）：写死 300 秒时，MiniMax-M3.1-Flash
+            # 在物化阶段直接超时失败，产物一个字都没落盘。
+            try:
+                mat_timeout = max(30, int(os.environ.get('FUSION_TIMEOUT', '600')))
+            except ValueError:
+                mat_timeout = 600
             report = materialize_candidate(result, orientation, workroot / job['id'],
                                            endpoint=endpoint, model=model, api_key=key,
-                                           timeout=300, thinking=thinking)
+                                           timeout=mat_timeout, thinking=thinking)
+            with self.lock:
+                if job['status'] == 'running':
+                    # 交付不全 ≠ 完成（口径见 materialize.materialize_verdict，
+                    # 单测直接调那个函数——服务端与测试只有一份实现）。
+                    status, error = materialize_verdict(report)
+                    if status == 'failed':
+                        job.update(status='failed', result=report, error=error)
+                    else:
+                        job.update(status='completed', result=report)
+        except Exception as exc:
+            with self.lock:
+                if job['status'] == 'running':
+                    job.update(status='failed', error=str(exc) if isinstance(exc, FusionError) else '物化请求失败，未产生包体')
+        finally:
+            with self.lock:
+                self.running = False
+
+    def _skillhub_download(self, slug, job):
+        # SkillHub 下载 worker：整包落盘（先临时目录再换名，失败不留半个包）。
+        # 下载是数据操作，不调用模型；异常文案区分明确拒绝与网络失败。
+        try:
+            report = skillhub_download(slug)
             with self.lock:
                 if job['status'] == 'running':
                     job.update(status='completed', result=report)
         except Exception as exc:
             with self.lock:
                 if job['status'] == 'running':
-                    job.update(status='failed', error=str(exc) if isinstance(exc, FusionError) else '物化请求失败，未产生包体')
+                    job.update(status='failed',
+                               error=str(exc) if isinstance(exc, FusionError) else 'SkillHub 下载失败，未落盘任何内容')
         finally:
             with self.lock:
                 self.running = False
@@ -308,12 +363,46 @@ class Workspace:
             # 界面本来就靠任务轮询显示进度，长一点不会变成无反馈等待。
             #
             # **分段模式转正（2026-10-07，机主批准）**：n=16 两臂 A/B（glm-4.5-air）
-            # 整份 0/16 vs 分段 14/16（`evaluations/ab-blocksplit.txt`）。引擎默认
-            # 保持关闭（受控对照需要），产品入口在这里打开；
-            # `FUSION_SPLIT=off` 可整体回退整份模式。
-            split = os.environ.get('FUSION_SPLIT', 'on') != 'off'
-            result = synthesize(packet, endpoint=endpoint, model=model, api_key=key, timeout=300,
-                                thinking=thinking, split_segments=split, segment_retries=3)
+            # 整份 0/16 vs 分段 14/16（`evaluations/ab-blocksplit.txt`）。
+            #
+            # **自适应（2026-10-12，机主裁定「分段按自适应 + 前置探测」）**：M3 导航批
+            # 反向——整份 1/4、分段 0/4（引文保真度不过段级重锚定）。分段收益是
+            # **模型条件性的**，所以默认改为 `auto`：先用一次调用探测第一段
+            # （profiles:A）能否过确定性校验，过→分段，不过→整份并如实留探测读数；
+            # `FUSION_SPLIT=on/off` 仍可强制。
+            # max_tokens 给 32768（2026-10-13/14 glm-5.3 系实测）：默认 8192 对「始终思考」
+            # 模型必然截断——思考链先烧掉大半预算，正文 JSON 写到一半断掉；
+            # glm-5.3-flash 全链实测 16384 仍不够、32768 通过。上限不是预扣，
+            # 非思考模型无代价。
+            split_mode = os.environ.get('FUSION_SPLIT', 'auto')
+            # 请求超时。2026-10-21 实测：MiniMax-M3.1-Flash 在 165K 字符上下文上
+            # 要跑 367 秒以上（它是「自适应思考」模型，不能关思考，思考链吃满预算），
+            # 原来的 300 秒固定值必然超时 → 被 catch 成一句通用英文错误，真因全丢。
+            # 改成可用 FUSION_TIMEOUT 覆盖，默认 600 秒。
+            try:
+                run_timeout = max(30, int(os.environ.get('FUSION_TIMEOUT', '600')))
+            except ValueError:
+                run_timeout = 600
+            probe = None
+            if split_mode == 'auto':
+                try:
+                    probe = segment_probe(packet, endpoint=endpoint, model=model, api_key=key,
+                                          timeout=min(run_timeout, 300), thinking=thinking,
+                                          max_tokens=32768)
+                except Exception as exc:                  # noqa: BLE001
+                    probe = {'ok': False, 'segment': None,
+                             'issues': ['探测请求失败：%s' % str(exc)[:160]]}
+                split = bool(probe.get('ok'))
+                with self.lock:
+                    if job['status'] == 'running':
+                        job['split_probe'] = probe
+            else:
+                split = split_mode != 'off'
+            result = synthesize(packet, endpoint=endpoint, model=model, api_key=key,
+                                timeout=run_timeout, thinking=thinking, split_segments=split,
+                                segment_retries=3, max_tokens=16384)
+            if probe is not None:
+                result['split_probe'] = probe
             with self.lock:
                 if job['status'] == 'running':
                     job.update(status='completed', result=result)
@@ -321,11 +410,48 @@ class Workspace:
         except Exception as exc:
             with self.lock:
                 if job['status'] == 'running':
-                    job.update(status='failed', error=str(exc) if isinstance(exc, FusionError) else 'Model request failed; no result was saved')
+                    # 真因必须可见（2026-10-21 实测）：MiniMax-M3.1-Flash 在 165K 字符上下文上
+                    # 跑了 367 秒才结束，超过 synthesize(timeout=300) → 抛原始异常 →
+                    # 被这句通用英文文案整个盖住，用户和机主都只看到「本次请求失败」。
+                    # 保留异常类型 + 原文（截断），FusionError 直接给原文。
+                    if isinstance(exc, FusionError):
+                        detail = str(exc)
+                    else:
+                        detail = '%s（%s）: %s' % (type(exc).__name__,
+                                                  _exc_label(exc), str(exc)[:400])
+                    job.update(status='failed', error=detail)
         finally:
             key = ''
             with self.lock:
                 self.running = False
+
+
+def _scrub_paths(text: str, body) -> str:
+    """把**用户传入的路径**从错误消息里脱敏掉（换成 `<路径>`）。
+
+    2026-10-21：HTTP 层开始回显异常原文后，Python 原生异常消息里的路径
+    （`FileNotFoundError: [WinError 2] … 'private-missing-path'`）
+    就被原样回给了调用方——用户输入的路径不该从错误里漏回去。
+    这里按**本请求体里出现过的路径值**精确替换，不做正则猜路径形态
+    （免得把正常文案里的东西也改掉）。
+    """
+    if not isinstance(body, dict) or not text:
+        return text
+    values = []
+    for key in ('a', 'b'):
+        v = body.get(key)
+        if isinstance(v, str) and len(v) >= 3:
+            values.append(v)
+    uploads = body.get('uploads')
+    if isinstance(uploads, dict):
+        for pack in uploads.values():
+            if isinstance(pack, dict):
+                for v in pack.values():
+                    if isinstance(v, str) and len(v) >= 3:
+                        values.append(v)
+    for v in sorted(set(values), key=len, reverse=True):
+        text = text.replace(v, '<路径>')
+    return text
 
 
 def make_server(port=4178, workspace=None):
@@ -428,12 +554,26 @@ def make_server(port=4178, workspace=None):
                     return self.reply(413, {'error': 'Expected bounded JSON request'})
                 self.connection.settimeout(10)
                 body = parse_json(self.rfile.read(size).decode('utf-8'))
+                # 读完请求体后**放宽超时**：上面的 10s 是给「读 body」设的，
+                # 但同一个 socket 超时会连带覆盖后续处理——而 inventory/prepare
+                # 要读两个母包（实测 6.2s）+ auto_select 再几秒，必然超 10s，
+                # 结果是 socket timeout → OSError → 被吞成「无法读取材料或请求格式错误」
+                # （真因不可见）。处理阶段不该受读体超时约束。
+                self.connection.settimeout(300)
                 path = urlsplit(self.path).path
                 if not path.startswith('/api/'):
                     return self.reply(404, {'error': 'Not found'})
                 return self.reply(200, workspace.call(path[5:], body))
             except (FusionError, OSError, ValueError, TypeError) as exc:
-                return self.reply(400, {'error': str(exc) if isinstance(exc, FusionError) else '无法读取材料或请求格式错误，请检查路径和输入'})
+                # **不要把真因吞成一句通用错**（2026-10-20 实测踩到：socket timeout
+                # 被吞成「无法读取材料或请求格式错误」，真因完全不可见，排查绕了大弯）。
+                # FusionError 是产品级拒绝，原样给；其余是意外，把**类型 + 原文**带上。
+                if isinstance(exc, FusionError):
+                    detail = str(exc)
+                else:
+                    detail = '无法读取材料或请求格式错误，请检查路径和输入（%s: %s）' % (
+                        type(exc).__name__, _scrub_paths(str(exc)[:200], body))
+                return self.reply(400, {'error': detail})
 
     return ThreadingHTTPServer(('127.0.0.1', port), Handler)
 

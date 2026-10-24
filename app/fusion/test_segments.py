@@ -864,5 +864,40 @@ class TwoPhaseCandidateTests(unittest.TestCase):
                              for s in seen), '开关关闭时不得发出证据段指令')
 
 
+class SegmentProbeTests(unittest.TestCase):
+    """分段适配探测（2026-10-12，机主裁定「分段按自适应 + 前置探测门控」）。
+
+    M3 导航批实测分段 0/4（引文保真度不过段级重锚定）而整份 1/4——分段收益是
+    **模型条件性的**，产品默认 `FUSION_SPLIT=auto` 先探测再选模式。
+    探测的铁律：**一次调用、无重试**——带重试就不是便宜的门了。
+    """
+
+    def test_probe_passes_on_valid_first_segment_with_single_call(self):
+        packet = _packet()
+        fixtures = _segment_fixtures(packet)
+
+        def respond(tag, body):
+            return _payload_for(fixtures, 'profiles:A', 'profiles')
+
+        with server_for(respond) as (url, seen):
+            report = engine.segment_probe(packet, endpoint=url, model='m', api_key='k')
+        self.assertTrue(report['ok'], report['issues'])
+        self.assertEqual(report['segment'], 'profiles:A', '探测只跑第一段')
+        self.assertEqual(len(seen), 1, '探测是一次调用，不带重试')
+
+    def test_probe_fails_without_retry_on_invalid_segment(self):
+        packet = _packet()
+        bad = json.dumps({'profiles': [{'parent': 'A'}]}, ensure_ascii=False)
+
+        def respond(tag, body):
+            return bad
+
+        with server_for(respond) as (url, seen):
+            report = engine.segment_probe(packet, endpoint=url, model='m', api_key='k')
+        self.assertFalse(report['ok'])
+        self.assertTrue(report['issues'], '失败必须带具体指控（供留档与人读）')
+        self.assertEqual(len(seen), 1, '探测失败也不重试——它只是门，不是产物')
+
+
 if __name__ == '__main__':
     unittest.main()

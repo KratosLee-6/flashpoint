@@ -358,3 +358,18 @@ body[data-motion=off] .fusion-status[aria-busy=true]{animation:none}
 .fusion-fill{margin:18px 0;padding:16px;border:1px dashed var(--line);border-radius:14px;background:var(--card)}
 .fusion-fill article{padding:12px 0;border-bottom:1px solid var(--line)}
 .fusion-fill article:last-of-type{border-bottom:0}
+
+/* 45 号文批次 3c/3d：物化 selftest 逐项展开 + SkillHub 在线包源搜索。 */
+.fusion-selftest-checks{list-style:none;padding:0;margin:10px 0;display:grid;gap:6px;font-size:13px}
+.fusion-selftest-checks li{padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);overflow-wrap:anywhere}
+.fusion-selftest-checks .check-ok{border-left:3px solid #1a7f37}
+.fusion-selftest-checks .check-fail{border-left:3px solid #b42318}
+body[data-theme=night] .fusion-selftest-checks .check-ok{border-left-color:#3fb96a}
+body[data-theme=night] .fusion-selftest-checks .check-fail{border-left-color:#e5484d}
+.fusion-skillhub-bar{display:flex;gap:10px;align-items:center;margin:12px 0}
+.fusion-skillhub-bar input{flex:1;min-width:0;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font-size:13px}
+.fusion-skillhub-list{list-style:none;padding:0;margin:12px 0;display:grid;gap:10px}
+.fusion-skillhub-list li{display:flex;gap:14px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card);min-width:0}
+.fusion-skillhub-list .fusion-skillhub-meta{min-width:0;flex:1}
+.fusion-skillhub-list b{font-size:14px}
+@media(max-width:720px){.fusion-skillhub-list li{flex-direction:column;align-items:stretch}.fusion-skillhub-bar{flex-direction:column;align-items:stretch}}

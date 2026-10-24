@@ -5,7 +5,13 @@ import re
 
 from .deliverables import Deliverables, _json, _sensitive
 from .packages import FusionError, digest, safe_path
-from .evaluations.session_experiment import ARMS
+
+# 七个对照臂的冻结口径（2026-09-24 首轮实验定下后未变）。定义在产品侧：
+# evaluations.session_experiment 反向引用这里（实验依赖产品，产品不得依赖实验——
+# 2026-10-24 公开仓库同步暴露的耦合：产品模块 import 实验目录，导致公开构建
+# 缺 evaluations 即断）。两侧改口径必须同步改对方的回归测试。
+ARMS = ('A_only', 'B_only', 'mechanical_concatenation', 'model_only',
+        'fusion', 'fusion_without_A', 'fusion_without_B')
 
 APP = Path(__file__).absolute().parents[1]
 DEFAULT_EXPERIMENTS = {'electrician-visual-repractice-v0-1-0': (
